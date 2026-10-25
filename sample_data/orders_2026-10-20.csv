@@ -1,0 +1,152 @@
+order_id,order_ts,customer_id,country,product_id,product_name,category,quantity,unit_price,currency,status
+100025,2026-10-20 00:07:05,C0135,US,P003,Keyboard,electronics,3,53.46,USD,cancelled
+100036,2026-10-20 00:15:42,C0031,DE,P010,Notebook A5,office,1,4.2,EUR,paid
+100057,2026-10-20 00:20:20,C0289,CZ,P006,Backpack,accessories,2,1445.5,CZK,paid
+100023,2026-10-20 00:25:04,C0059,GB,P005,Green tea,food,3,6.38,GBP,cancelled
+100110,2026-10-20 00:59:12,C0220,GB,P010,Notebook A5,office,1,3.57,GBP,paid
+100069,2026-10-20 01:27:09,C0108,FR,P005,Green tea,food,1,7.5,EUR,paid
+100008,2026-10-20 01:34:55,C0236,FR,P010,Notebook A5,office,3,4.2,EUR,cancelled
+100111,2026-10-20 01:49:50,C0195,DE,P008,Desk lamp,home,1,34.9,EUR,paid
+100064,2026-10-20 01:50:58,C0217,FR,P008,Desk lamp,home,1,34.9,EUR,paid
+100143,2026-10-20 01:52:14,C0245,DE,P006,Backpack,accessories,1,59.0,EUR,paid
+100148,2026-10-20 02:11:34,C0051,GB,P010,Notebook A5,office,2,3.57,GBP,paid
+100052,2026-10-20 02:29:41,C0035,DE,P002,Headphones,electronics,2,79.9,EUR,paid
+100009,2026-10-20 02:52:08,C0151,US,P002,Headphones,electronics,0,86.29,USD,refunded
+100011,2026-10-20 02:54:18,C0052,FR,P004,Coffee beans 1kg,food,1,18.9,EUR,paid
+100101,2026-10-20 02:56:01,C0078,GB,P006,Backpack,accessories,1,50.15,GBP,paid
+100149,2026-10-20 02:57:21,C0123,FR,P004,Coffee beans 1kg,food,1,18.9,EUR,paid
+100113,2026-10-20 02:58:55,C0010,FR,P007,Water bottle,accessories,2,15.0,EUR,cancelled
+100054,2026-10-20 02:59:05,C0299,GB,P001,Laptop,electronics,2,764.15,GBP,refunded
+100030,2026-10-20 03:07:06,C0249,CZ,P010,Notebook A5,office,3,102.9,CZK,paid
+100132,2026-10-20 03:23:16,C0114,CZ,P008,Desk lamp,home,1,855.05,CZK,paid
+100040,2026-10-20 03:31:44,C0221,CZ,P004,Coffee beans 1kg,food,3,463.05,CZK,paid
+100061,2026-10-20 03:46:17,C0136,FR,P009,Chair cushion,home,1,22.0,EUR,paid
+100026,2026-10-20 03:52:27,C0153,GB,P003,Keyboard,electronics,3,42.07,GBP,cancelled
+100116,2026-10-20 04:09:53,C0112,US,P003,Keyboard,electronics,2,53.46,USD,paid
+100079,2026-10-20 04:12:37,C0296,GB,P010,Notebook A5,office,2,3.57,GBP,paid
+100082,2026-10-20 04:32:14,C0154,PL,P006,Backpack,accessories,3,253.7,PLN,cancelled
+100141,2026-10-20 04:35:51,C0252,PL,P005,Green tea,food,3,32.25,PLN,paid
+100031,2026-10-20 04:40:28,C0244,DE,P009,Chair cushion,home,3,22.0,EUR,cancelled
+100056,2026-10-20 04:45:54,C0154,US,P005,Green tea,food,3,8.1,USD,paid
+100020,2026-10-20 05:02:11,C0253,DE,P006,Backpack,accessories,2,59.0,EUR,paid
+100093,2026-10-20 05:22:22,C0003,DE,P007,Water bottle,accessories,3,15.0,EUR,paid
+100068,2026-10-20 05:23:30,C0066,GB,P010,Notebook A5,office,2,3.57,GBP,paid
+100067,2026-10-20 05:25:36,C0019,PL,P002,Headphones,electronics,2,343.57,PLN,paid
+100102,2026-10-20 05:33:48,C0110,PL,P007,Water bottle,accessories,3,64.5,PLN,paid
+100027,2026-10-20 05:33:52,C0083,DE,P010,Notebook A5,office,1,4.2,EUR,cancelled
+100021,2026-10-20 05:33:53,C0082,CZ,P001,Laptop,electronics,3,22025.5,CZK,paid
+100150,2026-10-20 05:41:57,C0210,CZ,P009,Chair cushion,home,1,539.0,CZK,paid
+100047,2026-10-20 05:59:39,C0002,CZ,P007,Water bottle,accessories,2,367.5,CZK,paid
+100117,2026-10-20 06:06:32,C0059,FR,P005,Green tea,food,2,7.5,EUR,paid
+100117,2026-10-20 06:06:32,C0059,FR,P005,Green tea,food,2,7.5,EUR,paid
+100088,2026-10-20 06:10:41,C0044,PL,P008,Desk lamp,home,3,150.07,PLN,paid
+100094,2026-10-20 06:24:13,C0266,DE,P007,Water bottle,accessories,3,15.0,EUR,paid
+100130,2026-10-20 06:57:22,C0124,GB,P001,Laptop,electronics,1,764.15,GBP,paid
+100084,2026-10-20 06:59:04,C0195,DE,P009,Chair cushion,home,2,22.0,EUR,paid
+100010,2026-10-20 07:00:03,C0036,GB,P006,Backpack,accessories,3,50.15,GBP,paid
+100136,2026-10-20 07:00:42,C0062,CZ,P004,Coffee beans 1kg,food,1,463.05,CZK,cancelled
+100119,2026-10-20 07:13:15,C0125,US,P007,Water bottle,accessories,1,16.2,USD,paid
+100004,2026-10-20 07:14:22,C0280,GB,P001,Laptop,electronics,3,764.15,GBP,paid
+100115,2026-10-20 07:15:30,C0079,DE,P001,Laptop,electronics,1,899.0,EUR,paid
+100033,2026-10-20 07:19:25,C0160,PL,P009,Chair cushion,home,3,94.6,PLN,paid
+100086,2026-10-20 07:39:09,C0297,FR,P005,Green tea,food,2,7.5,EUR,refunded
+100058,2026-10-20 07:45:38,C0136,GB,P002,Headphones,electronics,2,67.92,GBP,paid
+100137,2026-10-20 07:52:41,C0248,DE,P003,Keyboard,electronics,3,49.5,EUR,paid
+100003,2026-10-20 07:57:37,C0259,CZ,P001,Laptop,electronics,1,22025.5,CZK,refunded
+100107,2026-10-20 07:59:20,C0224,US,P004,Coffee beans 1kg,food,1,20.41,USD,paid
+100114,2026-10-20 08:09:49,C0036,FR,P001,Laptop,electronics,3,899.0,EUR,paid
+100074,2026-10-20 08:17:11,C0013,FR,P006,Backpack,accessories,1,59.0,EUR,paid
+100131,2026-10-20 08:44:59,C0244,GB,P008,Desk lamp,home,3,29.66,GBP,paid
+100059,2026-10-20 08:53:38,C0146,CZ,P006,Backpack,accessories,1,1445.5,CZK,paid
+100014,2026-10-20 08:54:47,C0237,GB,P003,Keyboard,electronics,1,42.07,GBP,paid
+100091,2026-10-20 08:54:52,C0038,CZ,P001,Laptop,electronics,2,22025.5,CZK,paid
+100072,2026-10-20 09:02:07,C0082,PL,P007,Water bottle,accessories,1,64.5,PLN,paid
+100095,2026-10-20 09:04:22,C0234,GB,P001,Laptop,electronics,1,764.15,GBP,paid
+100044,2026-10-20 09:05:42,C0227,US,P005,Green tea,food,1,8.1,USD,cancelled
+100055,2026-10-20 09:29:39,C0161,FR,P009,Chair cushion,home,1,22.0,EUR,paid
+100018,2026-10-20 09:38:38,C0127,DE,P008,Desk lamp,home,1,34.9,EUR,cancelled
+100013,2026-10-20 09:43:13,C0037,DE,P006,Backpack,accessories,3,59.0,EUR,refunded
+100140,2026-10-20 09:59:14,C0028,DE,P009,Chair cushion,home,1,22.0,EUR,cancelled
+100001,2026-10-20 10:00:48,C0115,CZ,P002,Headphones,electronics,1,1957.55,CZK,paid
+100006,2026-10-20 10:07:01,C0111,FR,P007,Water bottle,accessories,1,15.0,EUR,paid
+100075,2026-10-20 10:08:37,C0143,FR,P007,Water bottle,accessories,1,-15.0,EUR,paid
+100126,2026-10-20 10:09:19,C0125,CZ,P004,Coffee beans 1kg,food,2,463.05,CZK,paid
+100142,2026-10-20 10:21:08,C0246,GB,P001,Laptop,electronics,2,764.15,GBP,paid
+100048,2026-10-20 10:23:08,C0285,US,P005,Green tea,food,2,8.1,USD,paid
+100100,2026-10-20 10:24:10,C0140,CZ,P008,Desk lamp,home,1,855.05,CZK,paid
+100049,2026-10-20 10:48:10,C0030,DE,P003,Keyboard,electronics,1,49.5,EUR,refunded
+100085,2026-10-20 10:57:26,C0281,GB,P010,Notebook A5,office,2,3.57,GBP,paid
+100060,2026-10-20 11:00:51,C0271,GB,P008,Desk lamp,home,2,-29.66,GBP,paid
+100029,2026-10-20 11:11:46,C0030,FR,P002,Headphones,electronics,1,79.9,EUR,paid
+100090,2026-10-20 11:18:07,C0102,PL,P004,Coffee beans 1kg,food,1,81.27,PLN,paid
+100050,2026-10-20 11:25:04,C0026,CZ,P009,Chair cushion,home,1,539.0,CZK,refunded
+100017,2026-10-20 11:27:25,C0256,GB,P004,Coffee beans 1kg,food,1,16.06,GBP,paid
+100016,2026-10-20 11:29:07,C0138,CZ,P004,Coffee beans 1kg,food,2,463.05,CZK,paid
+100112,2026-10-20 11:54:00,C0195,US,P004,Coffee beans 1kg,food,1,20.41,USD,paid
+100037,2026-10-20 12:01:49,C0264,CZ,P002,Headphones,electronics,1,1957.55,CZK,paid
+100103,2026-10-20 12:02:49,C0239,US,P007,Water bottle,accessories,2,16.2,USD,paid
+100065,2026-10-20 12:08:39,C0135,CZ,P001,Laptop,electronics,1,22025.5,CZK,paid
+100108,2026-10-20 12:14:17,C0208,US,P001,Laptop,electronics,3,970.92,USD,paid
+100035,2026-10-20 12:18:33,C0284,CZ,P004,Coffee beans 1kg,food,1,463.05,CZK,paid
+100042,2026-10-20 12:21:13,C0128,US,P001,Laptop,electronics,1,970.92,USD,paid
+100024,2026-10-20 12:23:07,C0151,PL,P005,Green tea,food,1,32.25,PLN,paid
+100122,2026-10-20 12:25:25,C0216,PL,P009,Chair cushion,home,1,94.6,PLN,paid
+100063,2026-10-20 12:29:02,C0136,DE,P010,Notebook A5,office,1,4.2,EUR,cancelled
+100078,2026-10-20 12:35:09,C0161,US,P010,Notebook A5,office,3,4.54,USD,paid
+100139,2026-10-20 13:08:21,C0155,DE,P005,Green tea,food,1,7.5,EUR,paid
+100123,2026-10-20 13:11:12,C0236,US,P002,Headphones,electronics,3,86.29,USD,paid
+100127,2026-10-20 13:47:54,C0015,GB,P010,Notebook A5,office,1,3.57,GBP,paid
+100007,2026-10-20 13:49:57,C0184,CZ,P002,Headphones,electronics,1,1957.55,CZK,paid
+100022,2026-10-20 14:00:32,C0240,CZ,P010,Notebook A5,office,2,102.9,CZK,cancelled
+100046,2026-10-20 14:47:49,C0247,DE,P004,Coffee beans 1kg,food,2,18.9,EUR,paid
+100083,2026-10-20 14:52:08,C0207,PL,P005,Green tea,food,1,32.25,PLN,paid
+100071,2026-10-20 15:00:40,C0092,DE,P003,Keyboard,electronics,1,49.5,EUR,paid
+100146,2026-10-20 15:09:08,C0116,GB,P002,Headphones,electronics,2,67.92,GBP,cancelled
+100104,2026-10-20 15:17:49,C0300,DE,P001,Laptop,electronics,2,899.0,EUR,paid
+100134,2026-10-20 15:29:31,C0282,FR,P009,Chair cushion,home,3,22.0,EUR,paid
+100066,2026-10-20 15:34:17,C0005,GB,P008,Desk lamp,home,2,29.66,GBP,paid
+100121,2026-10-20 15:35:48,C0190,GB,P006,Backpack,accessories,0,50.15,GBP,paid
+100081,2026-10-20 15:42:11,C0170,FR,P004,Coffee beans 1kg,food,1,18.9,EUR,refunded
+100080,2026-10-20 15:52:34,C0267,CZ,P005,Green tea,food,1,183.75,CZK,cancelled
+100087,2026-10-20 16:05:05,C0110,US,P006,Backpack,accessories,2,63.72,USD,cancelled
+100147,2026-10-20 16:07:08,C0220,US,P007,Water bottle,accessories,1,16.2,USD,paid
+100043,2026-10-20 16:20:00,C0217,GB,P004,Coffee beans 1kg,food,1,16.06,GBP,paid
+100135,2026-10-20 16:31:13,C0157,PL,P006,Backpack,accessories,1,253.7,PLN,paid
+100125,2026-10-20 16:55:31,C0138,US,P009,Chair cushion,home,2,23.76,USD,paid
+100041,2026-10-20 17:00:13,C0028,US,P007,Water bottle,accessories,3,16.2,USD,paid
+100073,2026-10-20 17:08:14,C0103,CZ,P007,Water bottle,accessories,1,367.5,CZK,paid
+100039,2026-10-20 17:12:33,C0243,GB,P010,Notebook A5,office,1,3.57,GBP,paid
+100098,2026-10-20 17:16:56,C0133,PL,P003,Keyboard,electronics,2,212.85,PLN,paid
+100105,2026-10-20 17:21:58,C0181,US,P010,Notebook A5,office,1,4.54,USD,paid
+100099,2026-10-20 17:38:37,C0123,GB,P005,Green tea,food,3,6.38,GBP,paid
+100038,2026-10-20 17:40:24,C0277,PL,P005,Green tea,food,1,32.25,PLN,paid
+100128,2026-10-20 17:45:04,C0182,DE,P006,Backpack,accessories,1,59.0,EUR,paid
+100144,2026-10-20 17:54:14,C0296,US,P002,Headphones,electronics,1,86.29,USD,paid
+100097,2026-10-20 18:22:42,C0281,PL,P010,Notebook A5,office,2,18.06,PLN,paid
+100034,2026-10-20 18:50:39,C0062,US,P006,Backpack,accessories,2,63.72,USD,paid
+100124,2026-10-20 18:59:46,C0139,DE,P007,Water bottle,accessories,3,15.0,EUR,refunded
+100032,2026-10-20 19:12:43,C0217,FR,P003,Keyboard,electronics,2,49.5,EUR,paid
+100051,2026-10-20 19:20:15,C0030,GB,P008,Desk lamp,home,1,29.66,GBP,cancelled
+100096,2026-10-20 19:20:16,C0163,PL,P008,Desk lamp,home,2,150.07,PLN,paid
+100076,2026-10-20 19:31:22,C0015,US,P009,Chair cushion,home,1,23.76,USD,paid
+100106,2026-10-20 19:35:45,C0280,US,P007,Water bottle,accessories,3,16.2,USD,refunded
+100002,2026-10-20 19:51:22,C0217,PL,P002,Headphones,electronics,1,343.57,PLN,paid
+100062,2026-10-20 20:08:32,C0140,PL,P002,Headphones,electronics,1,343.57,PLN,paid
+100015,2026-10-20 20:16:40,C0167,PL,P005,Green tea,food,1,32.25,PLN,paid
+100070,2026-10-20 20:23:05,C0080,FR,P002,Headphones,electronics,2,79.9,EUR,paid
+100145,2026-10-20 20:29:32,C0044,DE,P003,Keyboard,electronics,1,49.5,EUR,paid
+100053,2026-10-20 20:44:28,C0297,CZ,P007,Water bottle,accessories,1,367.5,CZK,refunded
+100092,2026-10-20 20:57:34,C0197,PL,P007,Water bottle,accessories,1,64.5,PLN,paid
+100118,2026-10-20 21:04:09,C0160,CZ,P005,Green tea,food,1,183.75,CZK,refunded
+100077,2026-10-20 21:08:19,C0020,DE,P005,Green tea,food,1,7.5,EUR,paid
+100133,2026-10-20 21:10:25,C0243,FR,P004,Coffee beans 1kg,food,1,18.9,EUR,cancelled
+100019,2026-10-20 21:17:02,C0299,FR,P009,Chair cushion,home,2,22.0,EUR,paid
+100005,2026-10-20 21:27:16,C0004,US,P004,Coffee beans 1kg,food,1,20.41,USD,paid
+100129,2026-10-20 21:42:19,C0142,FR,P006,Backpack,accessories,3,59.0,EUR,cancelled
+100138,2026-10-20 21:43:42,C0052,GB,P010,Notebook A5,office,1,3.57,GBP,paid
+100028,2026-10-20 21:48:24,C0251,CZ,P009,Chair cushion,home,1,539.0,CZK,paid
+100120,2026-10-20 21:51:37,C0290,PL,P005,Green tea,food,1,32.25,PLN,paid
+100109,2026-10-20 22:39:20,C0014,DE,P008,Desk lamp,home,2,34.9,EUR,paid
+100089,2026-10-20 23:02:40,C0172,PL,P009,Chair cushion,home,2,94.6,PLN,paid
+100012,2026-10-20 23:08:40,C0084,US,P005,Green tea,food,1,8.1,USD,paid
+100045,2026-10-20 23:44:37,C0008,CZ,P002,Headphones,electronics,2,1957.55,CZK,paid
