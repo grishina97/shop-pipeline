@@ -1,10 +1,10 @@
 from pyspark import pipelines as dp
 from pyspark.sql.functions import col, to_date, lit
 @dp.materialized_view(comment="Exchange rates against the EUR by day (silver)")
-@dp.expect_or_fail("rate_positive", "rate_to_eur > 0")          # курс <= 0 → ОСТАНОВИТЬ пайплайн (без курса gold будет неверным)
+@dp.expect_or_fail("rate_positive", "rate_to_eur > 0")          # rate <= 0 → STOP the pipeline (without the rate gold will be incorrect)
 def silver_rates():
     rates = (
-        spark.read.table("bronze_rates")                         # MV читает таблицу целиком (не поток)
+        spark.read.table("bronze_rates")                         # MV reads the entire table (not a stream)
         .select(
             to_date("rate_date").alias("rate_date"),             # string → date
             "currency",
@@ -12,10 +12,10 @@ def silver_rates():
         )
     )
     eur = (
-        rates.select("rate_date").distinct()                     # все даты, за которые есть курсы
-        .withColumn("currency", lit("EUR"))                      # добавить строку EUR на каждую дату
+        rates.select("rate_date").distinct()                     # all dates for which rates exist
+        .withColumn("currency", lit("EUR"))                      # add an EUR row for each date
         .withColumn("rate_to_eur", lit(1.0))                     # 1 EUR = 1 EUR
     )
-    return rates.unionByName(eur)                                # 4 валюты из API + EUR
+    return rates.unionByName(eur)                                # 4 currencies from API + EUR
 
 
