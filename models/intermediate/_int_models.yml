@@ -4,6 +4,12 @@ models:
   - name: int_rates_filled
     description: "Exchange rate for every day and currency. Weekends and holidays use the last published ECB rate."
     columns:
+      - name: rate_date
+        data_tests:
+          - not_null                   # -- part of the composite key
+      - name: currency
+        data_tests:
+          - not_null                   # -- part of the composite key
       - name: rate_to_eur
         data_tests:
           - not_null                   # -- there should be no gaps left after filling them in
