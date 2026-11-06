@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: fct_orders
+    description: "One row per valid order with amount in EUR. Weekend orders use the last published ECB rate."
+    columns:
+      - name: order_id
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        data_tests:
+          - not_null
+      - name: rate_to_eur
+        description: "Exchange rate to EUR on the order date."
+        data_tests:
+          - not_null                   # -- every order has rate, "testing during weekends"
+      - name: amount
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+
+  - name: agg_daily_revenue
+    description: "Paid revenue in EUR by day and country."
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['order_date', 'country']
+
+  - name: agg_category_revenue
+    description: "Paid revenue in EUR by product category."
+    columns:
+      - name: category
+        data_tests:
+          - unique
+          - not_null
