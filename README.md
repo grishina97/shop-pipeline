@@ -65,6 +65,14 @@ Third daily file processed incrementally:
 ## Repository structure
 
 ```text
+dbt/                             # dbt project (runs in dbt Cloud, subdirectory "dbt")
+  dbt_project.yml
+  packages.yml                   # dbt_utils
+  models/
+    staging/shop/                # stg_shop__orders, stg_shop__rates (on bronze tables)
+    intermediate/                # int_rates_filled (forward-filled ECB rates)
+    marts/finance/               # fct_orders, agg_daily_revenue, agg_category_revenue
+  macros/ tests/ analyses/ seeds/ snapshots/
 docs/
   dashboard.png                  # dashboard screenshot
 pipeline/shop-pipeline/
@@ -86,6 +94,7 @@ sample_data/                     # synthetic daily order files
   orders_2026-10-22.csv
 setup/
   01_setup_schema.sql            # schema and volume (run once)
+CLAUDE.md
 README.md
 ```
 
