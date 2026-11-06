@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Databricks (Free Edition) medallion pipeline for an online shop: daily order CSVs + ECB exchange rates (Frankfurter API) → revenue in EUR. The repo holds **two parallel implementations of the silver/gold logic** that read the same bronze tables:
 
 1. **Lakeflow Spark Declarative Pipelines** in `pipeline/shop-pipeline/` — the original, produces bronze, silver and gold tables in `workspace.shop`.
-2. **dbt project** at the repo root (`dbt_project.yml`, `models/`) — a newer reimplementation of silver/gold on top of the pipeline's bronze tables (declared as dbt source `shop` → `workspace.shop.bronze_orders` / `bronze_rates`).
+2. **dbt project** in `dbt/` (`dbt/dbt_project.yml`, `dbt/models/`) — a newer reimplementation of silver/gold on top of the pipeline's bronze tables (declared as dbt source `shop` → `workspace.shop.bronze_orders` / `bronze_rates`).
 
 When changing a business rule, check whether it must change in both places. `stg_shop__orders.sql` explicitly mirrors the expectations in `silver_orders.py` (customer_id not null, quantity > 0, unit_price > 0, dedup by order_id).
 
@@ -21,7 +21,9 @@ When changing a business rule, check whether it must change in both places. `stg
 - `data_quality/*.ipynb` are Databricks validation notebooks per layer; `dashboards/*.lvdash.json` is the AI/BI dashboard export.
 - One-time setup: `setup/01_setup_schema.sql` creates schema `workspace.shop` and volume `raw_files`. Run via Databricks; Lakeflow Job `shop_daily` runs daily at 17:00 Europe/Prague.
 
-## dbt project
+## dbt project (`dbt/`)
+
+All dbt files live in `dbt/`: `dbt_project.yml`, `packages.yml`, `package-lock.yml`, `models/`, `macros/`, `tests/`, `analyses/`, `seeds/`, `snapshots/`. Paths in this section are relative to `dbt/`. The dbt Cloud project must have **Project subdirectory** set to `dbt`.
 
 dbt runs in **dbt Cloud**: dbt Studio for development, a deployment job for production. There is no local `profiles.yml`, so **do not run dbt commands locally** — only edit the files; the user runs and tests them in dbt Cloud. Target is Databricks, so the SQL dialect is Spark/Databricks SQL (`qualify`, `explode(sequence(...))`, `last_value(x, true)`). `packages.yml` pulls in `dbt_utils`, which the tests depend on.
 
