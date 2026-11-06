@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: stg_shop__orders
+    description: "Orders from bronze: typed, deduplicated, invalid rows removed. One row per order."
+    columns:
+      - name: order_id
+        description: "Primary key of the order."
+        data_tests:
+          - unique
+          - not_null
+      - name: currency
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['CZK', 'EUR', 'GBP', 'PLN', 'USD']
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['paid', 'cancelled', 'refunded']
+
+  - name: stg_shop__rates
+    description: "Daily ECB exchange rates from bronze, typed. Business days only."
+    columns:
+      - name: rate_to_eur
+        data_tests:
+          - not_null
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['rate_date', 'currency']

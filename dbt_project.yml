@@ -1,0 +1,29 @@
+name: 'shop_pipeline'
+version: '1.0.0'
+config-version: 2
+
+profile: 'default'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"  # directory which will store compiled SQL files
+clean-targets:         # directories to be removed by `dbt clean`
+  - "target"
+  - "dbt_packages"
+
+models:
+  shop_pipeline:               # -- project name
+    staging:
+      +materialized: view      # -- easy cleanup, always up-to-date data
+      +schema: staging
+    intermediate:
+      +materialized: view      # -- view, so that one can examine int_rates_filled and run tests
+      +schema: intermediate
+    marts:
+      +materialized: table     # -- reporting data marts
+      +schema: marts

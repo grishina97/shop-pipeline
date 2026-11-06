@@ -1,0 +1,31 @@
+version: 2
+
+sources:
+  - name: shop
+    description: "Bronze layer of shop-pipeline, loaded by Lakeflow Declarative Pipelines."
+    database: workspace
+    schema: shop
+    config:
+      loaded_at_field: ingested_at           # -- one column for both tables
+      freshness:
+        warn_after: {count: 1, period: day}
+        error_after: {count: 2, period: day}
+    tables:
+      - name: bronze_orders
+        description: "Raw orders ingested from CSV files by Auto Loader. All columns are strings."
+        columns:
+          - name: order_id
+            description: "Order identifier. May contain duplicates in bronze."
+            data_tests:
+              - not_null                     # -- Uniqueness is not required, there may be duplicates among the bronze items.
+          - name: _rescued_data
+            description: "Values that did not match the expected schema (Auto Loader)."
+      - name: bronze_rates
+        description: "Daily EUR exchange rates loaded from the ECB API."
+        columns:
+          - name: rate_date
+            data_tests:
+              - not_null
+          - name: currency
+            data_tests:
+              - not_null
