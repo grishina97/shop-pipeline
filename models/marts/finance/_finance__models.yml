@@ -24,6 +24,13 @@ models:
 
   - name: agg_daily_revenue
     description: "Paid revenue in EUR by day and country."
+    columns:
+      - name: order_date
+        data_tests:
+          - not_null                   # -- part of the composite key
+      - name: country
+        data_tests:
+          - not_null                   # -- part of the composite key
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:

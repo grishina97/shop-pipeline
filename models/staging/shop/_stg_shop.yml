@@ -23,6 +23,12 @@ models:
   - name: stg_shop__rates
     description: "Daily ECB exchange rates from bronze, typed. Business days only."
     columns:
+      - name: rate_date
+        data_tests:
+          - not_null                   # -- part of the composite key
+      - name: currency
+        data_tests:
+          - not_null                   # -- part of the composite key
       - name: rate_to_eur
         data_tests:
           - not_null
