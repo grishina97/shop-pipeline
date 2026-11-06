@@ -1,4 +1,4 @@
-# dbt artifacts - not committed to source control
-dbt/target/
-dbt/dbt_packages/
-dbt/logs/
+# dbt artifacts - not committed to source control (matched at any level)
+target/
+dbt_packages/
+logs/
