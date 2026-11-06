@@ -1,0 +1,13 @@
+version: 2
+
+models:
+  - name: int_rates_filled
+    description: "Exchange rate for every day and currency. Weekends and holidays use the last published ECB rate."
+    columns:
+      - name: rate_to_eur
+        data_tests:
+          - not_null                   # -- there should be no gaps left after filling them in
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['rate_date', 'currency']   # -- one row per day and currency
