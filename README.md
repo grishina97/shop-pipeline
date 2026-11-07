@@ -108,16 +108,60 @@ Daily schedule (Europe/Prague), after ECB rates are published around 16:00 CET:
 Git workflow: `feature/*`, `docs/*`, `chore/*` branches → pull request → protected `main`
 (PR required, no force pushes).
 
+## CI/CD
+
+```mermaid
+flowchart LR
+    FB[feature branch] --> PR[pull request]
+    PR --> CI
+    subgraph CI["CI · ci.yml"]
+        BV["bundle validate<br/>-t dev / -t prod"]
+        DBT["dbt build in<br/>dbt_ci_pr_&lt;N&gt; schemas<br/>(dropped afterwards)"]
+    end
+    CI --> RC{required checks<br/>bundle + dbt}
+    RC -->|pass| M[merge to main]
+    M --> CD
+    subgraph CD["CD · cd.yml"]
+        PF["paths filter<br/>bundle files changed?"] --> AP["approval<br/>GitHub Environment prod"] --> DEP["databricks bundle<br/>deploy -t prod"]
+    end
+```
+
+- **CI** (`.github/workflows/ci.yml`) runs on every pull request. It validates the bundle for both targets and runs
+  `dbt deps` + `dbt build` in an isolated schema `dbt_ci_pr_<N>`. Its derived `_staging` / `_intermediate` / `_marts`
+  schemas are always dropped at the end, even if the build fails. The `bundle` and `dbt` checks are required to merge
+  into `main`.
+- **CD** (`.github/workflows/cd.yml`) runs after a merge to `main`, only when `databricks.yml`, `resources/`, `pipeline/`
+  or the workflow itself changed, or when started manually. It waits for approval in the GitHub Environment `prod`
+  (restricted to `main`), then runs `databricks bundle validate` and `deploy -t prod`. It never runs the pipeline; the
+  daily schedule does.
+- **Infrastructure as Code:** the Lakeflow pipeline and the `shop_daily` job are defined in `databricks.yml` and
+  `resources/`, with two targets.
+  - `dev`: prefixed resource names, paused schedule, a personal `dev_<user>_shop` schema.
+  - `prod`: `workspace.shop`, 17:00 schedule.
+
+  In prod the job is UI-locked, so every change goes through a pull request.
+- **Secrets:** Databricks host, token and SQL warehouse path are stored as GitHub Actions secrets. They are never
+  printed or written to disk. Nothing is deployed from a laptop.
+- **Why dbt-databricks in CI:** dbt Cloud runs dbt Fusion, which is still in preview and installed via a script. CI uses
+  a pinned `dbt-databricks` pip package for reproducible runs. The project YAML (e.g. test parameters under
+  `arguments:`) is kept compatible with both.
+- **Alerting:** `shop_daily` emails the owner on failure.
+
 ## How to run
 
 1. One-time setup: run `setup/01_setup_schema.sql`, upload files from `sample_data/` to `/Volumes/workspace/shop/raw_files/`.
-2. Run the Lakeflow pipeline (root folder `pipeline/shop-pipeline`, default schema `workspace.shop`) to load bronze.
+2. Load bronze: `databricks bundle deploy -t dev` and `databricks bundle run -t dev shop_daily` (prod is deployed by CD).
 3. Run the dbt Cloud production job (`dbt source freshness` → `dbt build`) to build `prod_shop_*`.
 4. Development: create a `feature/*` branch in dbt Studio and run `dbt build` into your personal `dbt_<username>_shop_*` schemas.
 
 ## Repository structure
 
 ```text
+.github/workflows/
+  ci.yml                           # PR checks: bundle validate + dbt build in a CI schema
+  cd.yml                           # prod deploy of the bundle after merge (with approval)
+databricks.yml                     # Databricks Asset Bundle: dev / prod targets
+resources/                         # bundle resources: Lakeflow pipeline, shop_daily job
 dbt/                               # dbt project (dbt Cloud project subdirectory)
   dbt_project.yml
   packages.yml                     # dbt_utils
@@ -151,8 +195,8 @@ docs/
 | Orchestration | Lakeflow Jobs, dbt Cloud jobs |
 | Reporting | Databricks AI/BI Dashboards |
 | Version control | Git, GitHub (pull requests, protected `main`) |
+| CI/CD and IaC | GitHub Actions, Databricks Asset Bundles, Databricks CLI |
 
 ## Roadmap
 
-- CI with GitHub Actions: run `dbt build` on a temporary schema for every pull request.
-- Deploy the Lakeflow pipeline, job and dashboard with Databricks Asset Bundles instead of manual setup.
+- Add the AI/BI dashboard to the Databricks Asset Bundle (the pipeline and the job are already managed there).
