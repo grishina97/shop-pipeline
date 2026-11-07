@@ -1,0 +1,46 @@
+# Databricks Asset Bundle for the Lakeflow bronze pipeline and the shop_daily job.
+# dbt (staging/intermediate/marts) is deployed separately by dbt Cloud and is not part of this bundle.
+bundle:
+  name: shop_pipeline
+
+include:
+  - resources/*.yml
+
+sync:
+  exclude:                     # only the Lakeflow code needs to be uploaded to the workspace
+    - dbt/**
+    - sample_data/**
+    - docs/**
+
+variables:
+  catalog:
+    description: Unity Catalog catalog for the bronze tables
+    default: workspace
+  schema:
+    description: Schema the Lakeflow pipeline writes bronze tables to
+
+targets:
+  dev:
+    mode: development          # names prefixed "[dev <user>]", schedules paused, pipeline in development mode
+    default: true
+    workspace:
+      host: https://dbc-e20a4581-d807.cloud.databricks.com
+    variables:
+      schema: shop             # dev mode prefixes the schema resource -> dev_<user>_shop, never the prod schema
+    resources:
+      schemas:
+        shop_dev:
+          catalog_name: ${var.catalog}
+          name: ${var.schema}
+          comment: Personal dev schema for the shop bronze pipeline (bundle dev target)
+      pipelines:
+        shop_pipeline:
+          schema: ${resources.schemas.shop_dev.name}   # resolves to the prefixed dev schema, created before the pipeline
+
+  prod:
+    mode: production
+    workspace:
+      host: https://dbc-e20a4581-d807.cloud.databricks.com
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      schema: shop

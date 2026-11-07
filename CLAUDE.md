@@ -18,7 +18,23 @@ Business rules (validation, dedup, currency conversion, revenue definitions) liv
 - `bronze_rates.py`: materialized view that calls the Frankfurter API on every run (`API_URL` has a hard-coded start date, 2026-10-01). Stores `eur_to_currency` (1 EUR = X).
 - `data_quality/Bronze Data Quality Check.ipynb` is a Databricks validation notebook for the bronze layer (data quality downstream of bronze is covered by dbt tests); `dashboards/*.lvdash.json` is the AI/BI dashboard export, which reads the dbt production marts (`workspace.prod_shop_marts.agg_daily_revenue`, `agg_category_revenue`).
 - One-time setup: `setup/01_setup_schema.sql` creates schema `workspace.shop` and volume `raw_files`. Run via Databricks.
-- Daily schedule (Europe/Prague): Lakeflow Job `shop_daily` loads bronze at 17:00 → dbt Cloud production job at 17:30 → AI/BI dashboard refresh at 18:00. The steps are separately scheduled, not chained, so a change that makes one step run longer can push it past the next step's start time.
+- Daily schedule (Europe/Prague): Lakeflow Job `shop_daily` (defined in the bundle, see below) loads bronze at 17:00 → dbt Cloud production job at 17:30 → AI/BI dashboard refresh at 18:00. The steps are separately scheduled, not chained, so a change that makes one step run longer can push it past the next step's start time.
+
+## Databricks Asset Bundle (`databricks.yml`, `resources/`)
+
+The Lakeflow pipeline (`resources/shop_pipeline.pipeline.yml`) and the `shop_daily` job (`resources/shop_daily.job.yml`) are defined as a bundle named `shop_pipeline`. dbt is not part of the bundle; it is deployed by dbt Cloud.
+
+- `dev` (default, `mode: development`): resources are named `[dev <user>] ...`, the job schedule is paused, the pipeline runs in development mode and writes to its own schema `workspace.dev_<user>_shop` (created by the bundle). It still reads raw files from the prod volume `/Volumes/workspace/shop/raw_files/`.
+- `prod` (`mode: production`): catalog `workspace`, schema `shop`, job scheduled at 17:00 Europe/Prague.
+
+Commands:
+- `databricks bundle validate -t dev` / `databricks bundle validate -t prod` — run after every change to `databricks.yml` or `resources/`.
+- `databricks bundle deploy -t dev`, `databricks bundle run -t dev shop_daily` — deploy and test your dev copy.
+- `databricks bundle destroy -t dev` — remove your dev copy.
+
+**Never deploy to prod from a laptop** (`databricks bundle deploy -t prod`, `bind -t prod`, `destroy -t prod`). Prod deploys will come from CI (GitHub Actions). Validating the prod target locally is fine.
+
+Documented exception: one-time manual bind of the existing prod pipeline and job was done on <date>; all later prod deploys come from CI only. (`databricks bundle deployment bind shop_pipeline f214ee88-3fd3-42a4-be3b-0f003bd224cf -t prod` and `databricks bundle deployment bind shop_daily 425019135502946 -t prod`.)
 
 ## dbt project (`dbt/`)
 
