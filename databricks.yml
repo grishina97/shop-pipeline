@@ -51,3 +51,9 @@ targets:
     variables:
       schema: shop
       dbt_schema: prod_shop    # same schemas as the dbt Cloud prod job: prod_shop_staging/_intermediate/_marts
+    resources:
+      dashboards:
+        shop_revenue:
+          # parent_path is immutable: keep the bound dashboard (01f1d0816e5311638750cbfb6e64343f) in its existing folder,
+          # otherwise the deploy deletes and recreates it with a new ID (links and subscriptions would be lost)
+          parent_path: /Workspace/Users/gri9409@gmail.com/shop-pipeline/pipeline/shop-pipeline/dashboards
