@@ -17,7 +17,8 @@ Business rules (validation, dedup, currency conversion, revenue definitions) liv
 - `bronze_orders.py`: Auto Loader over `/Volumes/workspace/shop/raw_files/` (streaming, incremental, all columns strings).
 - `bronze_rates.py`: materialized view that calls the Frankfurter API on every run (`API_URL` has a hard-coded start date, 2026-10-01). Stores `eur_to_currency` (1 EUR = X).
 - `data_quality/Bronze Data Quality Check.ipynb` is a Databricks validation notebook for the bronze layer (data quality downstream of bronze is covered by dbt tests); `dashboards/*.lvdash.json` is the AI/BI dashboard export, which reads the dbt production marts (`workspace.prod_shop_marts.agg_daily_revenue`, `agg_category_revenue`).
-- One-time setup: `setup/01_setup_schema.sql` creates schema `workspace.shop` and volume `raw_files`. Run via Databricks; Lakeflow Job `shop_daily` runs daily at 17:00 Europe/Prague.
+- One-time setup: `setup/01_setup_schema.sql` creates schema `workspace.shop` and volume `raw_files`. Run via Databricks.
+- Daily schedule (Europe/Prague): Lakeflow Job `shop_daily` loads bronze at 17:00 → dbt Cloud production job at 17:30 → AI/BI dashboard refresh at 18:00. The steps are separately scheduled, not chained, so a change that makes one step run longer can push it past the next step's start time.
 
 ## dbt project (`dbt/`)
 
@@ -30,7 +31,7 @@ Layering (configured in `dbt_project.yml`):
 - `intermediate/` — views, schema `intermediate`. `int_rates_filled` builds a date × currency calendar from the first rate date to `current_date()` and forward-fills the last published ECB rate (`is_filled` marks filled days), plus EUR=1.0, so weekend/holiday orders get a rate instead of failing.
 - `marts/finance/` — tables, schema `marts`. `fct_orders` → `agg_daily_revenue`, `agg_category_revenue` (paid only).
 
-Custom schemas use dbt's default `generate_schema_name` (no override in `macros/`), so they resolve to `<target_schema>_staging` etc.
+Custom schemas use dbt's default `generate_schema_name` (no override in `macros/`), so they resolve to `<target_schema>_staging` etc. Dev target schema is `dbt_<username>_shop` (e.g. `dbt_agrishina_shop_marts`); production is `prod_shop` (`prod_shop_staging`, `prod_shop_intermediate`, `prod_shop_marts`). The production job runs `dbt source freshness`, then `dbt build` (`dbt deps` runs automatically).
 
 Conventions:
 - `source()` only in staging models; `ref()` everywhere else.
