@@ -1,120 +1,158 @@
 # shop-pipeline
 
-End-to-end data pipeline on **Databricks** (Lakeflow Spark Declarative Pipelines) for an online shop:
-daily order files and an exchange-rate API are ingested, cleaned and combined into revenue tables in EUR.
-Built with a medallion architecture (bronze → silver → gold) and managed with Git / GitHub pull requests.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    A[CSV files<br/>Unity Catalog Volume] -->|Auto Loader| B[bronze_orders]
-    C[Frankfurter API<br/>ECB exchange rates] -->|requests| D[bronze_rates]
-    B --> E[silver_orders]
-    D --> F[silver_rates]
-    E --> G[gold_orders_eur]
-    F --> G
-    G --> H[gold_daily_revenue]
-    G --> I[gold_category_revenue]
-```
-
-## Data sources
-
-| Source | Description | Ingestion |
-|---|---|---|
-| Order files | **Synthetic** daily CSV files (`orders_YYYY-MM-DD.csv`) in 5 currencies: CZK, EUR, USD, GBP, PLN, generated with intentional data quality issues (nulls, zero quantity, negative price, duplicates) | Auto Loader (incremental, only new files) |
-| [Frankfurter API](https://frankfurter.dev) | Daily reference exchange rates published by the European Central Bank | HTTP request, full refresh |
-
-## Tables
-
-| Layer | Table | Type | Description |
-|---|---|---|---|
-| Bronze | `bronze_orders` | Streaming table | Raw orders as received + `source_file`, `ingested_at` |
-| Bronze | `bronze_rates` | Materialized view | Raw rates from the API (1 EUR = X currency) |
-| Silver | `silver_orders` | Streaming table | Typed, deduplicated orders; invalid rows dropped |
-| Silver | `silver_rates` | Materialized view | Rates converted to `rate_to_eur` + EUR = 1.0 |
-| Gold | `gold_orders_eur` | Materialized view | Each order with amount converted to EUR |
-| Gold | `gold_daily_revenue` | Materialized view | Orders and revenue (EUR) by date and country |
-| Gold | `gold_category_revenue` | Materialized view | Orders and revenue (EUR) by product category |
-
-## Dashboard
-
-AI/BI dashboard on gold tables: KPIs, revenue by day, country and category, with date and country filters.
+End-to-end analytics pipeline on **Databricks** for an online shop. Daily order files (CSV, five currencies) and daily
+European Central Bank exchange rates (Frankfurter API) are ingested, validated and combined into revenue reporting in EUR.
+Ingestion is handled by **Lakeflow Declarative Pipelines**, all transformation logic lives in **dbt**, and the results
+feed an AI/BI dashboard.
 
 ![Dashboard](docs/dashboard.png)
 
-## Orchestration
+## Architecture
 
-Lakeflow Job `shop_daily`: runs the pipeline, then refreshes the dashboard.
-Scheduled daily at 17:00 Europe/Prague (after ECB rates are published ~16:00 CET), email notification on failure.
+| Layer | Tool | Responsibility |
+|---|---|---|
+| Bronze | Lakeflow Declarative Pipelines | Ingestion only: Auto Loader for CSV files, HTTP API call for exchange rates. Raw data, all columns as strings, plus `source_file` / `ingested_at` |
+| Staging → intermediate → marts | dbt (dbt Cloud) | Typing, deduplication, validation, currency conversion, revenue aggregates, tests |
+| Reporting | Databricks AI/BI | Dashboard on the dbt marts |
+
+```mermaid
+flowchart LR
+    CSV["Daily order CSVs<br/>Unity Catalog Volume"] -->|Auto Loader| BO[bronze_orders]
+    API["Frankfurter API<br/>ECB rates"] -->|HTTP| BR[bronze_rates]
+
+    subgraph Lakeflow["Lakeflow Declarative Pipelines · workspace.shop"]
+        BO
+        BR
+    end
+
+    subgraph dbt["dbt Cloud"]
+        STG[staging] --> INT[intermediate] --> MARTS[marts]
+    end
+
+    BO --> STG
+    BR --> STG
+    MARTS --> DASH["AI/BI Dashboard<br/>Shop Revenue"]
+```
+
+## dbt lineage
+
+```mermaid
+flowchart LR
+    SO[("source: shop.bronze_orders")] --> STGO[stg_shop__orders]
+    SR[("source: shop.bronze_rates")] --> STGR[stg_shop__rates]
+    STGR --> INT[int_rates_filled]
+    STGO --> FCT[fct_orders]
+    INT --> FCT
+    FCT --> AD[agg_daily_revenue]
+    FCT --> AC[agg_category_revenue]
+```
+
+| Model | Materialization | Description |
+|---|---|---|
+| `stg_shop__orders` | view | Typed orders, deduplicated by `order_id` (latest load wins), `is_valid` flag |
+| `stg_shop__rates` | view | Typed ECB rates, inverted to `rate_to_eur` |
+| `int_rates_filled` | view | Rate for every calendar day × currency, forward-filled over weekends and holidays |
+| `fct_orders` | table | One row per valid order with amount converted to EUR |
+| `agg_daily_revenue` | table | Paid orders and revenue (EUR) by day and country |
+| `agg_category_revenue` | table | Paid orders and revenue (EUR) by product category |
+
+## Key design decision: weekend and holiday orders
+
+The ECB publishes reference rates on business days only, but the shop sells every day.
+
+The first version of the pipeline (a Lakeflow gold layer) joined each order to the rate **on the exact order date** and
+used a `FAIL UPDATE` expectation so that revenue would never be lost silently. That was safe but brittle: a single
+Saturday order had no matching rate and stopped the whole pipeline.
+
+In dbt this is solved in `int_rates_filled`:
+
+1. Build a calendar from the first published rate date to `current_date()`.
+2. Cross join it with all currencies to get one row per day × currency.
+3. Left join the published rates and forward-fill the gaps with the last published rate
+   (`last_value(rate_to_eur, true)` over the currency's history).
+4. Add `EUR = 1.0` for every day.
+
+Each row carries `is_filled` (the rate was carried forward) and `rate_published_date` (the day the rate actually comes
+from), and `fct_orders` exposes `is_rate_filled`, so filled rates stay transparent. The safety guarantee is kept as a
+test instead of a pipeline failure: `rate_to_eur` must be `not_null` in both `int_rates_filled` and `fct_orders`.
 
 ## Data quality
 
-- **silver_orders** – `expect_or_drop`: customer_id not null, quantity > 0, unit_price > 0; duplicates removed by `order_id`
-- **silver_rates** – `expect_or_fail`: rate_to_eur > 0 (a wrong rate would corrupt all revenue)
-- **gold_orders_eur** – `FAIL UPDATE` if an order has no matching exchange rate (revenue is never lost silently)
-- Data quality check notebooks for each layer: row counts, duplicates, nulls, invalid values, bronze → silver reconciliation
+- **Staging keeps every row.** `stg_shop__orders` adds an `is_valid` flag (customer present, quantity > 0,
+  unit price > 0); `fct_orders` filters on `is_valid`. Invalid rows stay inspectable instead of disappearing.
+- **Generic tests:** `unique` / `not_null` on primary keys, `not_null` on required fields (`order_ts`, `currency`,
+  `customer_id`, `rate_to_eur`), `accepted_values` on `currency` and `status`.
+- **dbt_utils tests:** `unique_combination_of_columns` for composite keys (`rate_date` + `currency`,
+  `order_date` + `country`), `accepted_range` for positive order amounts.
+- **Singular test:** `assert_no_future_orders` fails if any order is dated after today.
+- **Source freshness:** both bronze tables are checked on `ingested_at` (warn after 1 day, error after 2).
+- **Bronze notebook:** `Bronze Data Quality Check` validates the raw layer in Databricks.
 
-## Example run
+The sample files in `sample_data/` are synthetic and contain intentional issues (nulls, zero quantity, negative price,
+duplicate orders) to exercise these rules.
 
-Third daily file processed incrementally:
-- `bronze_orders`: 151 new rows (only the new file was read)
-- `silver_orders`: 146 rows (4 dropped by expectations, 1 duplicate removed)
-- `gold_orders_eur`: 438 orders across 3 days, all converted to EUR 
+## Environments and deployment
+
+| Environment | Where | Schemas |
+|---|---|---|
+| Development | dbt Studio (dbt Cloud IDE) | Personal schema per developer `dbt_<username>_shop` → `dbt_<username>_shop_staging`, `_intermediate`, `_marts` |
+| Production | dbt Cloud deployment job | `prod_shop_staging`, `prod_shop_intermediate`, `prod_shop_marts` |
+
+Daily schedule (Europe/Prague), after ECB rates are published around 16:00 CET:
+
+- **17:00** – Lakeflow Job `shop_daily` ingests new order files and rates into bronze.
+- **17:30** – dbt Cloud production job runs `dbt source freshness`, then `dbt build` (models + tests) into `prod_shop_*`
+  (`dbt deps` runs automatically).
+- **18:00** – the AI/BI dashboard refreshes on the new marts.
+
+Git workflow: `feature/*`, `docs/*`, `chore/*` branches → pull request → protected `main`
+(PR required, no force pushes).
+
+## How to run
+
+1. One-time setup: run `setup/01_setup_schema.sql`, upload files from `sample_data/` to `/Volumes/workspace/shop/raw_files/`.
+2. Run the Lakeflow pipeline (root folder `pipeline/shop-pipeline`, default schema `workspace.shop`) to load bronze.
+3. Run the dbt Cloud production job (`dbt source freshness` → `dbt build`) to build `prod_shop_*`.
+4. Development: create a `feature/*` branch in dbt Studio and run `dbt build` into your personal `dbt_<username>_shop_*` schemas.
 
 ## Repository structure
 
 ```text
-dbt/                             # dbt project (runs in dbt Cloud, subdirectory "dbt")
+dbt/                               # dbt project (dbt Cloud project subdirectory)
   dbt_project.yml
-  packages.yml                   # dbt_utils
+  packages.yml                     # dbt_utils
   models/
-    staging/shop/                # stg_shop__orders, stg_shop__rates (on bronze tables)
-    intermediate/                # int_rates_filled (forward-filled ECB rates)
-    marts/finance/               # fct_orders, agg_daily_revenue, agg_category_revenue
-  macros/ tests/ analyses/ seeds/ snapshots/
-docs/
-  dashboard.png                  # dashboard screenshot
+    staging/shop/                  # sources + stg_shop__orders, stg_shop__rates
+    intermediate/                  # int_rates_filled
+    marts/finance/                 # fct_orders, agg_daily_revenue, agg_category_revenue
+  tests/                           # singular tests (assert_no_future_orders)
 pipeline/shop-pipeline/
-  transformations/               # pipeline source code
-    bronze_orders.py             # Auto Loader: CSV files → bronze
-    bronze_rates.py              # Frankfurter API → bronze
-    silver_orders.py             # cleaning, types, expectations, dedup
-    silver_rates.py              # rates to EUR + EUR row
-    gold.sql                     # orders in EUR, daily and category revenue
-  data_quality/                  # validation notebooks for each layer
-    Bronze Data Quality Check
-    Silver Data Quality Check
-    Gold Data Quality Check
+  transformations/
+    bronze_orders.py               # Auto Loader: CSV files -> bronze
+    bronze_rates.py                # Frankfurter API -> bronze
+  data_quality/
+    Bronze Data Quality Check.ipynb
   dashboards/
-    Shop Revenue                 # AI/BI dashboard on gold tables
-sample_data/                     # synthetic daily order files
-  orders_2026-10-20.csv
-  orders_2026-10-21.csv
-  orders_2026-10-22.csv
+    Shop Revenue.lvdash.json       # AI/BI dashboard on dbt marts
 setup/
-  01_setup_schema.sql            # schema and volume (run once)
-CLAUDE.md
-README.md
+  01_setup_schema.sql              # schema and volume (run once)
+sample_data/                       # synthetic daily order files
+docs/
+  dashboard.png
 ```
-
-## How to run
-
-1. Run `setup/01_setup_schema.sql` to create the `workspace.shop` schema and the `raw_files` volume
-2. Upload order CSV files from `sample_data/` to `/Volumes/workspace/shop/raw_files/` (one file per run to see incremental loading)
-3. Create an ETL pipeline with root folder `pipeline/shop-pipeline` and default location `workspace.shop`
-4. Run the pipeline; upload the next CSV and run again – only the new file is processed
-
-## Development workflow
-
-- Feature branches (`feature/silver`, `feature/api-rates`, `feature/gold`, `feature/dashboard-job`) → pull request → merge into `main`
-- `main` is protected: pull request required, force pushes and deletion blocked
 
 ## Tech stack
 
-Databricks (Free Edition) · Lakeflow Spark Declarative Pipelines · Lakeflow Jobs · Auto Loader · Delta Lake · Unity Catalog · AI/BI Dashboards · PySpark · SQL · Git / GitHub
+| Area | Technology |
+|---|---|
+| Platform | Databricks (Free Edition), Unity Catalog, Delta Lake |
+| Ingestion | Lakeflow Spark Declarative Pipelines, Auto Loader, PySpark |
+| Transformation | dbt Cloud (dbt Studio, deployment jobs), dbt_utils, Databricks SQL |
+| Orchestration | Lakeflow Jobs, dbt Cloud jobs |
+| Reporting | Databricks AI/BI Dashboards |
+| Version control | Git, GitHub (pull requests, protected `main`) |
 
-## Next steps
+## Roadmap
 
-- dbt models for the gold layer
-- CI/CD with Databricks Asset Bundles and GitHub Actions
+- CI with GitHub Actions: run `dbt build` on a temporary schema for every pull request.
+- Deploy the Lakeflow pipeline, job and dashboard with Databricks Asset Bundles instead of manual setup.
