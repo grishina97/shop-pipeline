@@ -34,7 +34,7 @@ Commands:
 
 **Never deploy to prod from a laptop** (`databricks bundle deploy -t prod`, `bind -t prod`, `destroy -t prod`). Prod deploys will come from CI (GitHub Actions). Validating the prod target locally is fine.
 
-Documented exception: one-time manual bind of the existing prod pipeline and job was done on <date>; all later prod deploys come from CI only. (`databricks bundle deployment bind shop_pipeline f214ee88-3fd3-42a4-be3b-0f003bd224cf -t prod` and `databricks bundle deployment bind shop_daily 425019135502946 -t prod`.)
+Documented exception: one-time manual bind of the existing prod pipeline and job was done on 2026-11-07; all later prod deploys come from CI only. (`databricks bundle deployment bind shop_pipeline f214ee88-3fd3-42a4-be3b-0f003bd224cf -t prod` and `databricks bundle deployment bind shop_daily 425019135502946 -t prod`.)
 
 ## dbt project (`dbt/`)
 
@@ -60,3 +60,11 @@ Conventions:
 ## Workflow
 
 `main` is protected: work on `feature/*` / `chore/*` / `docs/*` branches and merge via pull request (no force pushes). `sample_data/` contains synthetic CSVs with intentional data-quality issues (nulls, zero quantity, negative price, duplicates) — these are expected, not bugs.
+
+## CI (`.github/workflows/ci.yml`)
+
+Runs on every pull request to `main`. It validates and tests only — it never deploys.
+- Job `bundle`: installs the Databricks CLI (`databricks/setup-cli`) and runs `databricks bundle validate -t dev` and `-t prod`.
+- Job `dbt`: installs `dbt-databricks` (pip, pinned), writes a `profiles.yml` that reads credentials via `env_var()`, and runs `dbt deps` + `dbt build` in `dbt/` against catalog `workspace`, schema `dbt_ci_pr_<PR number>` (custom schemas become `dbt_ci_pr_<N>_staging`, `_intermediate`, `_marts`). A final `if: always()` step drops every `dbt_ci_pr_<N>*` schema, even when the build fails or the run is cancelled. Sources are the prod bronze tables in `workspace.shop` (read-only).
+- Secrets: `DATABRICKS_HOST`, `DATABRICKS_TOKEN` (personal access token; Free Edition has no service principals), `DATABRICKS_HTTP_PATH` (SQL warehouse). Never `echo` them or write them into files.
+- CI uses dbt Core + `dbt-databricks`, while dbt Cloud may use Fusion. Keep YAML compatible with both (e.g. test parameters under `arguments:`, which dbt Core ≥ 1.10.5 also accepts).
