@@ -1,0 +1,22 @@
+# Daily job: refreshes the bronze pipeline. dbt Cloud runs at 17:30, the dashboard refreshes at 18:00.
+# Generated from the existing job 425019135502946 with `databricks bundle generate job`.
+resources:
+  jobs:
+    shop_daily:
+      name: shop_daily
+      max_concurrent_runs: 1
+      performance_target: PERFORMANCE_OPTIMIZED
+      queue:
+        enabled: true
+      schedule:                                   # no pause_status: dev mode then pauses it, prod defaults to UNPAUSED
+        quartz_cron_expression: 0 0 17 * * ?
+        timezone_id: Europe/Prague
+      email_notifications:
+        on_failure:
+          - gri9409@gmail.com
+        no_alert_for_skipped_runs: false
+      tasks:
+        - task_key: run_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.shop_pipeline.id}   # the pipeline from this bundle (dev or prod copy)
+          run_if: ALL_SUCCESS

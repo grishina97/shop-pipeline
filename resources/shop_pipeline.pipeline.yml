@@ -1,0 +1,16 @@
+# Lakeflow Declarative Pipeline: bronze ingestion only (orders CSV via Auto Loader, ECB rates via API).
+# Generated from the existing pipeline f214ee88-3fd3-42a4-be3b-0f003bd224cf with `databricks bundle generate pipeline`.
+resources:
+  pipelines:
+    shop_pipeline:
+      name: shop-pipeline
+      root_path: ../pipeline/shop-pipeline
+      libraries:
+        - glob:
+            include: ../pipeline/shop-pipeline/transformations/**
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      channel: CURRENT
+      continuous: false
+      photon: true
+      serverless: true
