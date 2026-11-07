@@ -9,7 +9,7 @@
         "  ROUND(SUM(revenue_eur), 2)               AS revenue_eur,     -- total revenue\r\n",
         "  SUM(orders)                              AS orders,          -- total paid orders\r\n",
         "  ROUND(SUM(revenue_eur) / SUM(orders), 2) AS avg_order_eur    -- average order value\r\n",
-        "FROM workspace.shop.gold_daily_revenue;\r\n"
+        "FROM workspace.prod_shop_marts.agg_daily_revenue;\r\n"
       ]
     },
     {
@@ -18,7 +18,7 @@
       "queryLines": [
         "-- dataset: daily — for daily chart and by-country chart\r\n",
         "SELECT order_date, country, orders, revenue_eur\r\n",
-        "FROM workspace.shop.gold_daily_revenue;\r\n"
+        "FROM workspace.prod_shop_marts.agg_daily_revenue;\r\n"
       ]
     },
     {
@@ -27,7 +27,7 @@
       "queryLines": [
         "-- dataset: category — for chart by category\r\n",
         "SELECT category, orders, revenue_eur\r\n",
-        "FROM workspace.shop.gold_category_revenue;"
+        "FROM workspace.prod_shop_marts.agg_category_revenue;"
       ]
     }
   ],
