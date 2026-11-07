@@ -33,7 +33,7 @@ deduplicated as (
     ) = 1
 ),
 
--- same rules as the expectations in silver_orders.py
+-- valid order: has a customer, positive quantity and positive unit price
 final as (
     select
         *,

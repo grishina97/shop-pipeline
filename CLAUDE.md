@@ -4,21 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Databricks (Free Edition) medallion pipeline for an online shop: daily order CSVs + ECB exchange rates (Frankfurter API) → revenue in EUR. The repo holds **two parallel implementations of the silver/gold logic** that read the same bronze tables:
+A Databricks (Free Edition) medallion pipeline for an online shop: daily order CSVs + ECB exchange rates (Frankfurter API) → revenue in EUR. Responsibilities are split between two tools, with no duplicated logic:
 
-1. **Lakeflow Spark Declarative Pipelines** in `pipeline/shop-pipeline/` — the original, produces bronze, silver and gold tables in `workspace.shop`.
-2. **dbt project** in `dbt/` (`dbt/dbt_project.yml`, `dbt/models/`) — a newer reimplementation of silver/gold on top of the pipeline's bronze tables (declared as dbt source `shop` → `workspace.shop.bronze_orders` / `bronze_rates`).
+1. **Lakeflow Spark Declarative Pipelines** in `pipeline/shop-pipeline/` — **bronze ingestion only**: loads raw orders and exchange rates into `workspace.shop.bronze_orders` / `bronze_rates`.
+2. **dbt project** in `dbt/` (`dbt/dbt_project.yml`, `dbt/models/`) — all transformation logic (staging → intermediate → marts) on top of the bronze tables (declared as dbt source `shop`). Production marts land in `workspace.prod_shop_marts`.
 
-When changing a business rule, check whether it must change in both places. `stg_shop__orders.sql` explicitly mirrors the expectations in `silver_orders.py` (customer_id not null, quantity > 0, unit_price > 0, dedup by order_id).
+Business rules (validation, dedup, currency conversion, revenue definitions) live only in dbt.
 
 ## Lakeflow pipeline (`pipeline/shop-pipeline/`)
 
 - Code runs inside Databricks only — there is no local execution or test harness. Python files use `from pyspark import pipelines as dp` (`@dp.table`, `@dp.materialized_view`, `@dp.expect_or_drop` / `expect_or_fail`) and rely on the implicit `spark` global. Tables reference each other by bare name (default catalog/schema `workspace.shop` is set on the pipeline).
 - `bronze_orders.py`: Auto Loader over `/Volumes/workspace/shop/raw_files/` (streaming, incremental, all columns strings).
 - `bronze_rates.py`: materialized view that calls the Frankfurter API on every run (`API_URL` has a hard-coded start date, 2026-10-01). Stores `eur_to_currency` (1 EUR = X).
-- `silver_rates.py` inverts to `rate_to_eur` and adds a synthetic EUR=1.0 row per date.
-- `gold.sql`: `gold_orders_eur` joins orders to rates **on the exact order date** with `FAIL UPDATE` if no rate is found — so orders on weekends/holidays (no ECB rate) will fail the pipeline. Revenue aggregates count only `status = 'paid'`.
-- `data_quality/*.ipynb` are Databricks validation notebooks per layer; `dashboards/*.lvdash.json` is the AI/BI dashboard export.
+- `data_quality/Bronze Data Quality Check.ipynb` is a Databricks validation notebook for the bronze layer (data quality downstream of bronze is covered by dbt tests); `dashboards/*.lvdash.json` is the AI/BI dashboard export, which reads the dbt production marts (`workspace.prod_shop_marts.agg_daily_revenue`, `agg_category_revenue`).
 - One-time setup: `setup/01_setup_schema.sql` creates schema `workspace.shop` and volume `raw_files`. Run via Databricks; Lakeflow Job `shop_daily` runs daily at 17:00 Europe/Prague.
 
 ## dbt project (`dbt/`)
@@ -29,7 +27,7 @@ dbt runs in **dbt Cloud**: dbt Studio for development, a deployment job for prod
 
 Layering (configured in `dbt_project.yml`):
 - `staging/shop/` — views, schema `staging`. `stg_shop__orders` does not drop invalid rows; it adds an `is_valid` flag. Filtering happens in `fct_orders` (`where orders.is_valid`).
-- `intermediate/` — views, schema `intermediate`. `int_rates_filled` builds a date × currency calendar from the first rate date to `current_date()` and forward-fills the last published ECB rate (`is_filled` marks filled days), plus EUR=1.0. This is the key behavioral difference from the Lakeflow gold layer: weekend orders get a rate instead of failing.
+- `intermediate/` — views, schema `intermediate`. `int_rates_filled` builds a date × currency calendar from the first rate date to `current_date()` and forward-fills the last published ECB rate (`is_filled` marks filled days), plus EUR=1.0, so weekend/holiday orders get a rate instead of failing.
 - `marts/finance/` — tables, schema `marts`. `fct_orders` → `agg_daily_revenue`, `agg_category_revenue` (paid only).
 
 Custom schemas use dbt's default `generate_schema_name` (no override in `macros/`), so they resolve to `<target_schema>_staging` etc.

@@ -9,8 +9,12 @@ models:
         data_tests:
           - unique
           - not_null
+      - name: order_ts
+        data_tests:
+          - not_null                   # -- NULL after cast = timestamp failed to parse
       - name: currency
         data_tests:
+          - not_null                   # -- needed to find the exchange rate
           - accepted_values:
               arguments:
                 values: ['CZK', 'EUR', 'GBP', 'PLN', 'USD']
