@@ -4,6 +4,7 @@ resources:
   jobs:
     shop_daily:
       name: shop_daily
+      description: "Daily bronze ingestion: Auto Loader for order CSVs and ECB rates API. Managed by Databricks Asset Bundle, deployed via GitHub Actions CD."
       max_concurrent_runs: 1
       performance_target: PERFORMANCE_OPTIMIZED
       queue:
