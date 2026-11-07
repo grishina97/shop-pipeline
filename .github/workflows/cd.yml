@@ -1,0 +1,41 @@
+# CD: deploys the Databricks Asset Bundle (Lakeflow bronze pipeline + shop_daily job) to prod.
+# Runs after every merge to main, or manually. This is the only place prod is deployed from.
+# It does not run the pipeline or the job: the daily schedule (17:00 Europe/Prague) handles that.
+name: CD
+
+on:
+  push:
+    branches: [main]
+    paths:                                     # deploy only when something in the bundle changed
+      - databricks.yml
+      - resources/**
+      - pipeline/**
+      - .github/workflows/cd.yml
+  workflow_dispatch:                           # manual start ignores the paths filter
+
+permissions:
+  contents: read
+
+concurrency:                                   # never two prod deploys at once; a running deploy is not cancelled
+  group: cd-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy prod
+    runs-on: ubuntu-24.04
+    environment: prod                          # waits for approval by the required reviewer before running
+    timeout-minutes: 20
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: databricks/setup-cli@v1.23.0
+
+      - name: Validate bundle (prod)
+        run: databricks bundle validate -t prod
+
+      - name: Deploy bundle (prod)
+        run: databricks bundle deploy -t prod

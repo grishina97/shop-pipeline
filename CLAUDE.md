@@ -32,9 +32,9 @@ Commands:
 - `databricks bundle deploy -t dev`, `databricks bundle run -t dev shop_daily` — deploy and test your dev copy.
 - `databricks bundle destroy -t dev` — remove your dev copy.
 
-**Never deploy to prod from a laptop** (`databricks bundle deploy -t prod`, `bind -t prod`, `destroy -t prod`). Prod deploys will come from CI (GitHub Actions). Validating the prod target locally is fine.
+**Prod deploys happen only through `.github/workflows/cd.yml`.** Never run `databricks bundle deploy -t prod`, `bind -t prod` or `destroy -t prod` from a laptop. Read-only commands against prod (`bundle validate -t prod`, `bundle plan -t prod`) are fine locally.
 
-Documented exception: one-time manual bind of the existing prod pipeline and job was done on 2026-11-07; all later prod deploys come from CI only. (`databricks bundle deployment bind shop_pipeline f214ee88-3fd3-42a4-be3b-0f003bd224cf -t prod` and `databricks bundle deployment bind shop_daily 425019135502946 -t prod`.)
+Documented exception: one-time manual bind of the existing prod pipeline and job was done on 2026-11-07; all later prod deploys come from `cd.yml` only. (`databricks bundle deployment bind shop_pipeline f214ee88-3fd3-42a4-be3b-0f003bd224cf -t prod` and `databricks bundle deployment bind shop_daily 425019135502946 -t prod`.)
 
 ## dbt project (`dbt/`)
 
@@ -68,3 +68,9 @@ Runs on every pull request to `main`. It validates and tests only — it never d
 - Job `dbt`: installs `dbt-databricks` (pip, pinned), writes a `profiles.yml` that reads credentials via `env_var()`, and runs `dbt deps` + `dbt build` in `dbt/` against catalog `workspace`, schema `dbt_ci_pr_<PR number>` (custom schemas become `dbt_ci_pr_<N>_staging`, `_intermediate`, `_marts`). A final `if: always()` step drops every `dbt_ci_pr_<N>*` schema, even when the build fails or the run is cancelled. Sources are the prod bronze tables in `workspace.shop` (read-only).
 - Secrets: `DATABRICKS_HOST`, `DATABRICKS_TOKEN` (personal access token; Free Edition has no service principals), `DATABRICKS_HTTP_PATH` (SQL warehouse). Never `echo` them or write them into files.
 - CI uses dbt Core + `dbt-databricks`, while dbt Cloud may use Fusion. Keep YAML compatible with both (e.g. test parameters under `arguments:`, which dbt Core ≥ 1.10.5 also accepts).
+
+## CD (`.github/workflows/cd.yml`)
+
+The only way to deploy to prod. Runs on push to `main` (i.e. after a PR is merged) when `databricks.yml`, `resources/**`, `pipeline/**` or `cd.yml` changed, and on manual start (`workflow_dispatch`, ignores the paths filter). The job uses GitHub Environment `prod`, which requires approval by the repo owner before the deploy starts. Steps: `databricks bundle validate -t prod`, then `databricks bundle deploy -t prod`, authenticated with `DATABRICKS_HOST` / `DATABRICKS_TOKEN`. Concurrency group `cd-prod` keeps deploys strictly one at a time (a running deploy is never cancelled). It does not run the pipeline or the job — the 17:00 schedule does. dbt is not deployed here; dbt Cloud picks up `main` itself.
+
+After a bundle deploy the prod job is `UI_LOCKED`: change the pipeline/job in `resources/` via a PR, not in the Databricks UI (UI edits are overwritten by the next deploy).
