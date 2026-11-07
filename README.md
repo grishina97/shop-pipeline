@@ -12,27 +12,30 @@ feed an AI/BI dashboard.
 | Layer | Tool | Responsibility |
 |---|---|---|
 | Bronze | Lakeflow Declarative Pipelines | Ingestion only: Auto Loader for CSV files, HTTP API call for exchange rates. Raw data, all columns as strings, plus `source_file` / `ingested_at` |
-| Staging → intermediate → marts | dbt (dbt Cloud) | Typing, deduplication, validation, currency conversion, revenue aggregates, tests |
+| Staging → intermediate → marts | dbt (Databricks dbt task in prod, dbt Studio for development) | Typing, deduplication, validation, currency conversion, revenue aggregates, tests |
 | Reporting | Databricks AI/BI | Dashboard on the dbt marts |
+| Orchestration | Lakeflow Job `shop_daily` | One job, three dependent tasks: pipeline → dbt → dashboard refresh |
 
 ```mermaid
 flowchart LR
     CSV["Daily order CSVs<br/>Unity Catalog Volume"] -->|Auto Loader| BO[bronze_orders]
     API["Frankfurter API<br/>ECB rates"] -->|HTTP| BR[bronze_rates]
 
-    subgraph Lakeflow["Lakeflow Declarative Pipelines · workspace.shop"]
+    subgraph Lakeflow["run_pipeline · Lakeflow Declarative Pipelines · workspace.shop"]
         BO
         BR
     end
 
-    subgraph dbt["dbt Cloud"]
+    subgraph dbt["run_dbt · dbt task · prod_shop_*"]
         STG[staging] --> INT[intermediate] --> MARTS[marts]
     end
 
     BO --> STG
     BR --> STG
-    MARTS --> DASH["AI/BI Dashboard<br/>Shop Revenue"]
+    MARTS --> DASH["refresh_dashboard<br/>AI/BI Dashboard Shop Revenue"]
 ```
+
+All three steps run as tasks of the single job `shop_daily`; each task starts only if the previous one succeeded.
 
 ## dbt lineage
 
@@ -96,14 +99,15 @@ duplicate orders) to exercise these rules.
 | Environment | Where | Schemas |
 |---|---|---|
 | Development | dbt Studio (dbt Cloud IDE) | Personal schema per developer `dbt_<username>_shop` → `dbt_<username>_shop_staging`, `_intermediate`, `_marts` |
-| Production | dbt Cloud deployment job | `prod_shop_staging`, `prod_shop_intermediate`, `prod_shop_marts` |
+| Production | `run_dbt` task of the Databricks job `shop_daily` (serverless, pinned `dbt-databricks`) | `prod_shop_staging`, `prod_shop_intermediate`, `prod_shop_marts` |
 
-Daily schedule (Europe/Prague), after ECB rates are published around 16:00 CET:
+Daily schedule: one job, `shop_daily`, at **17:00 Europe/Prague** (after ECB rates are published around 16:00 CET):
 
-- **17:00** – Lakeflow Job `shop_daily` ingests new order files and rates into bronze.
-- **17:30** – dbt Cloud production job runs `dbt source freshness`, then `dbt build` (models + tests) into `prod_shop_*`
-  (`dbt deps` runs automatically).
-- **18:00** – the AI/BI dashboard refreshes on the new marts.
+1. `run_pipeline` – the Lakeflow pipeline ingests new order files and rates into bronze.
+2. `run_dbt` – `dbt deps`, `dbt source freshness`, `dbt build` (models + tests) into `prod_shop_*` on the SQL warehouse.
+3. `refresh_dashboard` – refreshes the Shop Revenue AI/BI dashboard on the new marts.
+
+A task runs only if the previous one succeeded; any failure emails the owner.
 
 Git workflow: `feature/*`, `docs/*`, `chore/*` branches → pull request → protected `main`
 (PR required, no force pushes).
@@ -130,29 +134,30 @@ flowchart LR
   `dbt deps` + `dbt build` in an isolated schema `dbt_ci_pr_<N>`. Its derived `_staging` / `_intermediate` / `_marts`
   schemas are always dropped at the end, even if the build fails. The `bundle` and `dbt` checks are required to merge
   into `main`.
-- **CD** (`.github/workflows/cd.yml`) runs after a merge to `main`, only when `databricks.yml`, `resources/`, `pipeline/`
-  or the workflow itself changed, or when started manually. It waits for approval in the GitHub Environment `prod`
+- **CD** (`.github/workflows/cd.yml`) runs after a merge to `main`, only when `databricks.yml`, `resources/`, `pipeline/`,
+  `dbt/` or the workflow itself changed, or when started manually. It waits for approval in the GitHub Environment `prod`
   (restricted to `main`), then runs `databricks bundle validate` and `deploy -t prod`. It never runs the pipeline; the
   daily schedule does.
-- **Infrastructure as Code:** the Lakeflow pipeline and the `shop_daily` job are defined in `databricks.yml` and
-  `resources/`, with two targets.
-  - `dev`: prefixed resource names, paused schedule, a personal `dev_<user>_shop` schema.
-  - `prod`: `workspace.shop`, 17:00 schedule.
+- **Infrastructure as Code:** the Lakeflow pipeline, the `shop_daily` job (including the dbt task) and the Shop Revenue
+  dashboard are defined in `databricks.yml` and `resources/`, with two targets.
+  - `dev`: prefixed resource names, paused schedule, personal schemas `dev_<user>_shop` (bronze) and
+    `dev_<user>_shop_staging` / `_intermediate` / `_marts` (dbt).
+  - `prod`: `workspace.shop` and `prod_shop_*`, 17:00 schedule.
 
   In prod the job is UI-locked, so every change goes through a pull request.
 - **Secrets:** Databricks host, token and SQL warehouse path are stored as GitHub Actions secrets. They are never
   printed or written to disk. Nothing is deployed from a laptop.
-- **Why dbt-databricks in CI:** dbt Cloud runs dbt Fusion, which is still in preview and installed via a script. CI uses
-  a pinned `dbt-databricks` pip package for reproducible runs. The project YAML (e.g. test parameters under
-  `arguments:`) is kept compatible with both.
+- **Why dbt-databricks:** dbt Studio (development) runs dbt Fusion, which is still in preview and installed via a script.
+  CI and the production dbt task both use the same pinned `dbt-databricks` pip package, so what CI tests is what prod
+  runs. The project YAML (e.g. test parameters under `arguments:`) is kept compatible with both.
 - **Alerting:** `shop_daily` emails the owner on failure.
 
 ## How to run
 
 1. One-time setup: run `setup/01_setup_schema.sql`, upload files from `sample_data/` to `/Volumes/workspace/shop/raw_files/`.
-2. Load bronze: `databricks bundle deploy -t dev` and `databricks bundle run -t dev shop_daily` (prod is deployed by CD).
-3. Run the dbt Cloud production job (`dbt source freshness` → `dbt build`) to build `prod_shop_*`.
-4. Development: create a `feature/*` branch in dbt Studio and run `dbt build` into your personal `dbt_<username>_shop_*` schemas.
+2. `databricks bundle deploy -t dev` and `databricks bundle run -t dev shop_daily` run the whole chain (pipeline → dbt →
+   dashboard) in your personal dev schemas. Prod is deployed by CD and runs on the 17:00 schedule.
+3. Development: create a `feature/*` branch in dbt Studio and run `dbt build` into your personal `dbt_<username>_shop_*` schemas.
 
 ## Repository structure
 
@@ -161,8 +166,8 @@ flowchart LR
   ci.yml                           # PR checks: bundle validate + dbt build in a CI schema
   cd.yml                           # prod deploy of the bundle after merge (with approval)
 databricks.yml                     # Databricks Asset Bundle: dev / prod targets
-resources/                         # bundle resources: Lakeflow pipeline, shop_daily job
-dbt/                               # dbt project (dbt Cloud project subdirectory)
+resources/                         # bundle resources: Lakeflow pipeline, shop_daily job, dashboard
+dbt/                               # dbt project (run by the shop_daily dbt task; dbt Studio subdirectory)
   dbt_project.yml
   packages.yml                     # dbt_utils
   models/
@@ -191,12 +196,13 @@ docs/
 |---|---|
 | Platform | Databricks (Free Edition), Unity Catalog, Delta Lake |
 | Ingestion | Lakeflow Spark Declarative Pipelines, Auto Loader, PySpark |
-| Transformation | dbt Cloud (dbt Studio, deployment jobs), dbt_utils, Databricks SQL |
-| Orchestration | Lakeflow Jobs, dbt Cloud jobs |
+| Transformation | dbt (dbt-databricks in prod and CI, dbt Studio for development), dbt_utils, Databricks SQL |
+| Orchestration | Lakeflow Jobs (pipeline, dbt and dashboard tasks) |
 | Reporting | Databricks AI/BI Dashboards |
 | Version control | Git, GitHub (pull requests, protected `main`) |
 | CI/CD and IaC | GitHub Actions, Databricks Asset Bundles, Databricks CLI |
 
 ## Roadmap
 
-- Add the AI/BI dashboard to the Databricks Asset Bundle (the pipeline and the job are already managed there).
+- Make the dbt source schema configurable, so the dev target's dbt task reads the dev bronze tables instead of prod
+  bronze.

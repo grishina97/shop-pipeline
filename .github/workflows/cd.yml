@@ -1,4 +1,4 @@
-# CD: deploys the Databricks Asset Bundle (Lakeflow bronze pipeline + shop_daily job) to prod.
+# CD: deploys the Databricks Asset Bundle (Lakeflow pipeline, shop_daily job, dbt project files, dashboard) to prod.
 # Runs after every merge to main, or manually. This is the only place prod is deployed from.
 # It does not run the pipeline or the job: the daily schedule (17:00 Europe/Prague) handles that.
 name: CD
@@ -10,6 +10,7 @@ on:
       - databricks.yml
       - resources/**
       - pipeline/**
+      - dbt/**                                 # the prod dbt task runs the dbt project synced by the bundle
       - .github/workflows/cd.yml
   workflow_dispatch:                           # manual start ignores the paths filter
 
