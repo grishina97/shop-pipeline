@@ -5,7 +5,7 @@ European Central Bank exchange rates (Frankfurter API) are ingested, validated a
 Ingestion is handled by **Lakeflow Declarative Pipelines**, all transformation logic lives in **dbt**, and the results
 feed an AI/BI dashboard.
 
-![Dashboard](docs/dashboard.png)
+![Dashboard](docs/dashboard.jpg)
 
 ## Architecture
 
@@ -182,7 +182,7 @@ setup/
   01_setup_schema.sql              # schema and volume (run once)
 sample_data/                       # synthetic daily order files
 docs/
-  dashboard.png
+  dashboard.jpg
 ```
 
 ## Tech stack
