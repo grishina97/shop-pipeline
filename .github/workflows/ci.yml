@@ -1,0 +1,99 @@
+# CI for pull requests to main. Validates the Databricks Asset Bundle and builds + tests the dbt project
+# in a throwaway schema. Nothing is deployed: no `bundle deploy`, no writes outside dbt_ci_pr_<N>* schemas.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:                                   # one run per PR; a new push cancels the previous run
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    name: bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: databricks/setup-cli@v1.23.0
+
+      - name: Validate bundle (dev)
+        run: databricks bundle validate -t dev
+
+      - name: Validate bundle (prod)
+        run: databricks bundle validate -t prod
+
+  dbt:
+    name: dbt
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: dbt
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      CI_SCHEMA: dbt_ci_pr_${{ github.event.pull_request.number }}
+      DBT_PROFILES_DIR: ${{ github.workspace }}/.ci_profiles
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dbt-databricks
+        run: pip install "dbt-databricks==1.13.0"
+
+      # Credentials stay in env vars; the file only holds env_var() references, so no secret is written to disk.
+      - name: Write profiles.yml
+        run: |
+          mkdir -p "$DBT_PROFILES_DIR"
+          cat > "$DBT_PROFILES_DIR/profiles.yml" <<'EOF'
+          default:
+            target: ci
+            outputs:
+              ci:
+                type: databricks
+                catalog: workspace
+                schema: "{{ env_var('CI_SCHEMA') }}"
+                host: "{{ env_var('DATABRICKS_HOST') | replace('https://', '') | replace('/', '') }}"
+                http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+                token: "{{ env_var('DATABRICKS_TOKEN') }}"
+                threads: 4
+          EOF
+
+      - name: dbt deps
+        run: dbt deps
+
+      - name: dbt build
+        run: dbt build --target ci
+
+      # Always runs (also on failure or cancellation). Drops the base CI schema and every custom schema
+      # dbt derived from it (dbt_ci_pr_<N>_staging, _intermediate, _marts).
+      - uses: databricks/setup-cli@v1.23.0
+        if: always()
+
+      - name: Drop CI schemas
+        if: always()
+        run: |
+          schemas=$(databricks schemas list workspace -o json \
+            | jq -r --arg base "$CI_SCHEMA" '.[].name | select(. == $base or startswith($base + "_"))')
+          if [ -z "$schemas" ]; then
+            echo "No CI schemas to drop."
+            exit 0
+          fi
+          for s in $schemas; do
+            echo "Dropping workspace.$s"
+            databricks schemas delete "workspace.$s" --force
+          done
