@@ -1,0 +1,9 @@
+# AI/BI dashboard on the dbt marts (workspace.prod_shop_marts).
+# Existing prod dashboard: 01f1d0816e5311638750cbfb6e64343f (bound once by hand, see CLAUDE.md).
+resources:
+  dashboards:
+    shop_revenue:
+      display_name: Shop Revenue
+      file_path: ../pipeline/shop-pipeline/dashboards/Shop Revenue.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      embed_credentials: true                  # as on the existing published dashboard: viewers use the owner's credentials

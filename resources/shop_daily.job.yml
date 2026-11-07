@@ -1,10 +1,10 @@
-# Daily job: refreshes the bronze pipeline. dbt Cloud runs at 17:30, the dashboard refreshes at 18:00.
-# Generated from the existing job 425019135502946 with `databricks bundle generate job`.
+# Daily orchestration job: bronze pipeline -> dbt build -> dashboard refresh.
+# Each task runs only if the previous one succeeded. Originally generated from job 425019135502946.
 resources:
   jobs:
     shop_daily:
       name: shop_daily
-      description: "Daily bronze ingestion: Auto Loader for order CSVs and ECB rates API. Managed by Databricks Asset Bundle, deployed via GitHub Actions CD."
+      description: "Daily orchestration: bronze ingestion (Auto Loader for order CSVs, ECB rates API) -> dbt build -> Shop Revenue dashboard refresh. Managed by Databricks Asset Bundle, deployed via GitHub Actions CD."
       max_concurrent_runs: 1
       performance_target: PERFORMANCE_OPTIMIZED
       queue:
@@ -16,8 +16,40 @@ resources:
         on_failure:
           - gri9409@gmail.com
         no_alert_for_skipped_runs: false
+
+      environments:
+        - environment_key: dbt
+          spec:
+            environment_version: "2"
+            dependencies:
+              - dbt-databricks==1.13.0            # keep in sync with .github/workflows/ci.yml
+
       tasks:
         - task_key: run_pipeline
           pipeline_task:
             pipeline_id: ${resources.pipelines.shop_pipeline.id}   # the pipeline from this bundle (dev or prod copy)
           run_if: ALL_SUCCESS
+
+        - task_key: run_dbt
+          depends_on:
+            - task_key: run_pipeline
+          run_if: ALL_SUCCESS
+          environment_key: dbt                    # serverless job compute with pinned dbt-databricks
+          dbt_task:
+            project_directory: ../dbt
+            source: WORKSPACE
+            warehouse_id: ${var.warehouse_id}     # SQL runs on the warehouse; the task generates profiles.yml for it
+            catalog: ${var.catalog}
+            schema: ${var.dbt_schema}
+            commands:
+              - dbt deps
+              - dbt source freshness
+              - dbt build
+
+        - task_key: refresh_dashboard
+          depends_on:
+            - task_key: run_dbt
+          run_if: ALL_SUCCESS
+          dashboard_task:
+            dashboard_id: ${resources.dashboards.shop_revenue.id}
+            warehouse_id: ${var.warehouse_id}

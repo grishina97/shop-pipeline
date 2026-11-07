@@ -1,5 +1,5 @@
-# Databricks Asset Bundle for the Lakeflow bronze pipeline and the shop_daily job.
-# dbt (staging/intermediate/marts) is deployed separately by dbt Cloud and is not part of this bundle.
+# Databricks Asset Bundle: Lakeflow bronze pipeline, the shop_daily orchestration job
+# (pipeline -> dbt -> dashboard refresh) and the Shop Revenue AI/BI dashboard.
 bundle:
   name: shop_pipeline
 
@@ -7,17 +7,22 @@ include:
   - resources/*.yml
 
 sync:
-  exclude:                     # only the Lakeflow code needs to be uploaded to the workspace
-    - dbt/**
+  exclude:                     # upload only what runs in the workspace: Lakeflow code and the dbt project
     - sample_data/**
     - docs/**
+    - pipeline/shop-pipeline/dashboards/**   # deployed as a dashboard resource; syncing it would create a stray copy
 
 variables:
   catalog:
-    description: Unity Catalog catalog for the bronze tables
+    description: Unity Catalog catalog for all tables
     default: workspace
   schema:
     description: Schema the Lakeflow pipeline writes bronze tables to
+  dbt_schema:
+    description: dbt target schema; models land in <dbt_schema>_staging, _intermediate, _marts
+  warehouse_id:
+    description: SQL warehouse for the dbt task and the dashboard
+    default: a201bb41d987c4b2   # Serverless Starter Warehouse
 
 targets:
   dev:
@@ -27,6 +32,7 @@ targets:
       host: https://dbc-e20a4581-d807.cloud.databricks.com
     variables:
       schema: shop             # dev mode prefixes the schema resource -> dev_<user>_shop, never the prod schema
+      dbt_schema: dev_${workspace.current_user.short_name}_shop   # -> dev_<user>_shop_staging/_intermediate/_marts
     resources:
       schemas:
         shop_dev:
@@ -44,3 +50,4 @@ targets:
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
     variables:
       schema: shop
+      dbt_schema: prod_shop    # same schemas as the dbt Cloud prod job: prod_shop_staging/_intermediate/_marts
