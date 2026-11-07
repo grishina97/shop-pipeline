@@ -38,7 +38,7 @@ Commands:
 
 **Prod deploys happen only through `.github/workflows/cd.yml`.** Never run `databricks bundle deploy -t prod`, `bind -t prod` or `destroy -t prod` from a laptop. Read-only commands against prod (`bundle validate -t prod`, `bundle plan -t prod`) are fine locally.
 
-Documented exception: one-time manual bind of the existing prod pipeline and job was done on 2026-11-07; all later prod deploys come from `cd.yml` only. (`databricks bundle deployment bind shop_pipeline f214ee88-3fd3-42a4-be3b-0f003bd224cf -t prod` and `databricks bundle deployment bind shop_daily 425019135502946 -t prod`.) The Shop Revenue dashboard needs the same one-time manual bind before its first prod deploy: `databricks bundle deployment bind shop_revenue 01f1d0816e5311638750cbfb6e64343f -t prod` (date: <to fill in>).
+Documented exception: one-time manual bind of the existing prod pipeline and job was done on 2026-11-07; all later prod deploys come from `cd.yml` only. (`databricks bundle deployment bind shop_pipeline f214ee88-3fd3-42a4-be3b-0f003bd224cf -t prod` and `databricks bundle deployment bind shop_daily 425019135502946 -t prod`.) The Shop Revenue dashboard needs the same one-time manual bind before its first prod deploy: `databricks bundle deployment bind shop_revenue 01f1d0816e5311638750cbfb6e64343f -t prod` (date: <to fill in>). The prod target pins the dashboard's `parent_path` to its existing folder (`/Workspace/Users/gri9409@gmail.com/shop-pipeline/pipeline/shop-pipeline/dashboards`): `parent_path` is immutable, and changing it makes the deploy delete and recreate the dashboard with a new ID. Always check `databricks bundle plan -t prod` for `recreate` before approving a CD run.
 
 ## dbt project (`dbt/`)
 
