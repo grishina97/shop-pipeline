@@ -26,6 +26,9 @@ variables:
   raw_files_path:
     description: Volume folder that generate_orders writes synthetic order CSVs to and Auto Loader reads from
     default: /Volumes/workspace/shop/raw_files
+  dbt_source_schema:
+    description: Bronze schema the dbt source "shop" reads (dbt var shop_source_schema, passed by the run_dbt task)
+    default: shop
 
 targets:
   dev:
@@ -38,6 +41,7 @@ targets:
       dbt_schema: dev_${workspace.current_user.short_name}_shop   # -> dev_<user>_shop_staging/_intermediate/_marts
       # personal dev volume, so generated test files never land in the prod volume
       raw_files_path: /Volumes/${var.catalog}/${resources.schemas.shop_dev.name}/${resources.volumes.raw_files_dev.name}
+      dbt_source_schema: ${resources.schemas.shop_dev.name}   # dev dbt reads the dev bronze tables (dev_<user>_shop)
     resources:
       schemas:
         shop_dev:

@@ -160,7 +160,7 @@ flowchart LR
 - **Infrastructure as Code:** the Lakeflow pipeline, the `shop_daily` job (including the dbt task) and the Shop Revenue
   dashboard are defined in `databricks.yml` and `resources/`, with two targets.
   - `dev`: prefixed resource names, paused schedule, personal volume `dev_<user>_shop.raw_files` (generated orders),
-    personal schemas `dev_<user>_shop` (bronze) and
+    personal schemas `dev_<user>_shop` (bronze, also read by dev dbt via the dbt var `shop_source_schema`) and
     `dev_<user>_shop_staging` / `_intermediate` / `_marts` (dbt).
   - `prod`: `workspace.shop` and `prod_shop_*`, 17:00 schedule.
 
@@ -223,8 +223,3 @@ docs/
 | Reporting | Databricks AI/BI Dashboards |
 | Version control | Git, GitHub (pull requests, protected `main`) |
 | CI/CD and IaC | GitHub Actions, Databricks Asset Bundles, Databricks CLI |
-
-## Roadmap
-
-- Make the dbt source schema configurable, so the dev target's dbt task reads the dev bronze tables instead of prod
-  bronze.
