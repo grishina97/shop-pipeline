@@ -1,6 +1,6 @@
 # shop-pipeline
 
-End-to-end analytics pipeline on **Databricks** for an online shop. Daily order files (CSV, five currencies) and daily
+End-to-end analytics pipeline on **Databricks** for an online shop. Daily order files (CSV, five currencies; **synthetic, generated every day by the job**) and daily
 European Central Bank exchange rates (Frankfurter API) are ingested, validated and combined into revenue reporting in EUR.
 Ingestion is handled by **Lakeflow Declarative Pipelines**, all transformation logic lives in **dbt**, and the results
 feed an AI/BI dashboard.
@@ -14,11 +14,12 @@ feed an AI/BI dashboard.
 | Bronze | Lakeflow Declarative Pipelines | Ingestion only: Auto Loader for CSV files, HTTP API call for exchange rates. Raw data, all columns as strings, plus `source_file` / `ingested_at` |
 | Staging → intermediate → marts | dbt (Databricks dbt task in prod, dbt Studio for development) | Typing, deduplication, validation, currency conversion, revenue aggregates, tests |
 | Reporting | Databricks AI/BI | Dashboard on the dbt marts |
-| Orchestration | Lakeflow Job `shop_daily` | One job, three dependent tasks: pipeline → dbt → dashboard refresh |
+| Orchestration | Lakeflow Job `shop_daily` | One job, four dependent tasks: order generator → pipeline → dbt → dashboard refresh |
 
 ```mermaid
 flowchart LR
-    CSV["Daily order CSVs<br/>Unity Catalog Volume"] -->|Auto Loader| BO[bronze_orders]
+    GEN["generate_orders<br/>synthetic daily CSV"] --> CSV["Daily order CSVs<br/>Unity Catalog Volume"]
+    CSV -->|Auto Loader| BO[bronze_orders]
     API["Frankfurter API<br/>ECB rates"] -->|HTTP| BR[bronze_rates]
 
     subgraph Lakeflow["run_pipeline · Lakeflow Declarative Pipelines · workspace.shop"]
@@ -35,7 +36,7 @@ flowchart LR
     MARTS --> DASH["refresh_dashboard<br/>AI/BI Dashboard Shop Revenue"]
 ```
 
-All three steps run as tasks of the single job `shop_daily`; each task starts only if the previous one succeeded.
+All four steps run as tasks of the single job `shop_daily`; each task starts only if the previous one succeeded.
 
 ## dbt lineage
 
@@ -91,8 +92,25 @@ test instead of a pipeline failure: `rate_to_eur` must be `not_null` in both `in
 - **Source freshness:** both bronze tables are checked on `ingested_at` (warn after 1 day, error after 2).
 - **Bronze notebook:** `Bronze Data Quality Check` validates the raw layer in Databricks.
 
-The sample files in `sample_data/` are synthetic and contain intentional issues (nulls, zero quantity, negative price,
-duplicate orders) to exercise these rules.
+## Synthetic order data
+
+There is no real shop behind this project: **all orders are synthetic**. Exchange rates are real ECB data.
+
+Every day the first task of `shop_daily`, `generate_orders` (`src/generate_orders.py`, serverless Python), writes one
+file `orders_<today>.csv` into the raw files volume, so `bronze_orders` stays fresh and the dbt source freshness check
+passes:
+
+- same columns and format as the files in `sample_data/`, same products, countries, currencies and unit prices;
+- about 150 orders on weekdays and about 100 on weekends, timestamps up to the time of the run;
+- `order_id` continues after the current maximum in `bronze_orders` (and in any file not yet ingested);
+- the same intentional data-quality issues as the samples: one duplicate row, two rows with quantity 0, one negative
+  unit price and sometimes an empty `customer_id`;
+- if the file for today already exists, the task does nothing, so re-running the job is safe.
+
+The prod job writes to `/Volumes/workspace/shop/raw_files/`, the dev target to its own volume
+`/Volumes/workspace/dev_<user>_shop/raw_files/`, which the dev pipeline reads instead of the prod volume.
+`sample_data/` keeps a few example files with the same intentional issues (nulls, zero quantity, negative price,
+duplicate orders).
 
 ## Environments and deployment
 
@@ -103,9 +121,10 @@ duplicate orders) to exercise these rules.
 
 Daily schedule: one job, `shop_daily`, at **17:00 Europe/Prague** (after ECB rates are published around 16:00 CET):
 
-1. `run_pipeline` – the Lakeflow pipeline ingests new order files and rates into bronze.
-2. `run_dbt` – `dbt deps`, `dbt source freshness`, `dbt build` (models + tests) into `prod_shop_*` on the SQL warehouse.
-3. `refresh_dashboard` – refreshes the Shop Revenue AI/BI dashboard on the new marts.
+1. `generate_orders` – writes one synthetic order file `orders_<today>.csv` to the raw files volume (see below).
+2. `run_pipeline` – the Lakeflow pipeline ingests new order files and rates into bronze.
+3. `run_dbt` – `dbt deps`, `dbt source freshness`, `dbt build` (models + tests) into `prod_shop_*` on the SQL warehouse.
+4. `refresh_dashboard` – refreshes the Shop Revenue AI/BI dashboard on the new marts.
 
 A task runs only if the previous one succeeded; any failure emails the owner.
 
@@ -134,13 +153,14 @@ flowchart LR
   `dbt deps` + `dbt build` in an isolated schema `dbt_ci_pr_<N>`. Its derived `_staging` / `_intermediate` / `_marts`
   schemas are always dropped at the end, even if the build fails. The `bundle` and `dbt` checks are required to merge
   into `main`.
-- **CD** (`.github/workflows/cd.yml`) runs after a merge to `main`, only when `databricks.yml`, `resources/`, `pipeline/`,
+- **CD** (`.github/workflows/cd.yml`) runs after a merge to `main`, only when `databricks.yml`, `resources/`, `pipeline/`, `src/`,
   `dbt/` or the workflow itself changed, or when started manually. It waits for approval in the GitHub Environment `prod`
   (restricted to `main`), then runs `databricks bundle validate` and `deploy -t prod`. It never runs the pipeline; the
   daily schedule does.
 - **Infrastructure as Code:** the Lakeflow pipeline, the `shop_daily` job (including the dbt task) and the Shop Revenue
   dashboard are defined in `databricks.yml` and `resources/`, with two targets.
-  - `dev`: prefixed resource names, paused schedule, personal schemas `dev_<user>_shop` (bronze) and
+  - `dev`: prefixed resource names, paused schedule, personal volume `dev_<user>_shop.raw_files` (generated orders),
+    personal schemas `dev_<user>_shop` (bronze) and
     `dev_<user>_shop_staging` / `_intermediate` / `_marts` (dbt).
   - `prod`: `workspace.shop` and `prod_shop_*`, 17:00 schedule.
 
@@ -154,7 +174,7 @@ flowchart LR
 
 ## How to run
 
-1. One-time setup: run `setup/01_setup_schema.sql`, upload files from `sample_data/` to `/Volumes/workspace/shop/raw_files/`.
+1. One-time setup: run `setup/01_setup_schema.sql`. Optionally upload the files from `sample_data/` to `/Volumes/workspace/shop/raw_files/`; after that the job generates a new file every day.
 2. `databricks bundle deploy -t dev` and `databricks bundle run -t dev shop_daily` run the whole chain (pipeline → dbt →
    dashboard) in your personal dev schemas. Prod is deployed by CD and runs on the 17:00 schedule.
 3. Development: create a `feature/*` branch in dbt Studio and run `dbt build` into your personal `dbt_<username>_shop_*` schemas.
@@ -185,7 +205,9 @@ pipeline/shop-pipeline/
     Shop Revenue.lvdash.json       # AI/BI dashboard on dbt marts
 setup/
   01_setup_schema.sql              # schema and volume (run once)
-sample_data/                       # synthetic daily order files
+src/
+  generate_orders.py               # synthetic daily order CSV (first task of shop_daily)
+sample_data/                       # synthetic example order files (same format as the generated ones)
 docs/
   dashboard.jpg
 ```
