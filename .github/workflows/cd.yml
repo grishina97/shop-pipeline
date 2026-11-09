@@ -11,6 +11,7 @@ on:
       - resources/**
       - pipeline/**
       - dbt/**                                 # the prod dbt task runs the dbt project synced by the bundle
+      - src/**                                 # generate_orders script of the shop_daily job
       - .github/workflows/cd.yml
   workflow_dispatch:                           # manual start ignores the paths filter
 

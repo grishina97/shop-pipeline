@@ -23,6 +23,9 @@ variables:
   warehouse_id:
     description: SQL warehouse for the dbt task and the dashboard
     default: a201bb41d987c4b2   # Serverless Starter Warehouse
+  raw_files_path:
+    description: Volume folder that generate_orders writes synthetic order CSVs to and Auto Loader reads from
+    default: /Volumes/workspace/shop/raw_files
 
 targets:
   dev:
@@ -33,15 +36,25 @@ targets:
     variables:
       schema: shop             # dev mode prefixes the schema resource -> dev_<user>_shop, never the prod schema
       dbt_schema: dev_${workspace.current_user.short_name}_shop   # -> dev_<user>_shop_staging/_intermediate/_marts
+      # personal dev volume, so generated test files never land in the prod volume
+      raw_files_path: /Volumes/${var.catalog}/${resources.schemas.shop_dev.name}/${resources.volumes.raw_files_dev.name}
     resources:
       schemas:
         shop_dev:
           catalog_name: ${var.catalog}
           name: ${var.schema}
           comment: Personal dev schema for the shop bronze pipeline (bundle dev target)
+      volumes:
+        raw_files_dev:
+          catalog_name: ${var.catalog}
+          schema_name: ${resources.schemas.shop_dev.name}
+          name: raw_files
+          comment: Personal dev volume for synthetic order CSVs (bundle dev target)
       pipelines:
         shop_pipeline:
           schema: ${resources.schemas.shop_dev.name}   # resolves to the prefixed dev schema, created before the pipeline
+          configuration:
+            shop.raw_files_path: ${var.raw_files_path}   # dev pipeline reads the dev volume; prod uses the default in bronze_orders.py
 
   prod:
     mode: production

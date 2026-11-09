@@ -9,26 +9,28 @@ A Databricks (Free Edition) medallion pipeline for an online shop: daily order C
 1. **Lakeflow Spark Declarative Pipelines** in `pipeline/shop-pipeline/` — **bronze ingestion only**: loads raw orders and exchange rates into `workspace.shop.bronze_orders` / `bronze_rates`.
 2. **dbt project** in `dbt/` (`dbt/dbt_project.yml`, `dbt/models/`) — all transformation logic (staging → intermediate → marts) on top of the bronze tables (declared as dbt source `shop`). Production marts land in `workspace.prod_shop_marts`.
 
-Both run in one Databricks job, `shop_daily`, defined in the bundle: `run_pipeline` → `run_dbt` → `refresh_dashboard`.
+Both run in one Databricks job, `shop_daily`, defined in the bundle: `generate_orders` → `run_pipeline` → `run_dbt` → `refresh_dashboard`.
+
+**Order data is synthetic and generated daily.** There is no real shop: `src/generate_orders.py` (job task `generate_orders`, serverless Python script task) writes one `orders_<today>.csv` per day into the raw files volume — same format, products and prices as `sample_data/`, ~150 orders on weekdays / ~100 on weekends, `order_id` continuing after the max in `bronze_orders` (and in not-yet-ingested files), and the same intentional data-quality issues (1 duplicate, 2× quantity 0, 1 negative price, sometimes an empty `customer_id`). If today's file already exists it does nothing, so re-runs are safe. Generation is seeded by the date, so the same date gives the same file. Exchange rates are real ECB data.
 
 Business rules (validation, dedup, currency conversion, revenue definitions) live only in dbt.
 
 ## Lakeflow pipeline (`pipeline/shop-pipeline/`)
 
 - Code runs inside Databricks only — there is no local execution or test harness. Python files use `from pyspark import pipelines as dp` (`@dp.table`, `@dp.materialized_view`, `@dp.expect_or_drop` / `expect_or_fail`) and rely on the implicit `spark` global. Tables reference each other by bare name (default catalog/schema `workspace.shop` is set on the pipeline).
-- `bronze_orders.py`: Auto Loader over `/Volumes/workspace/shop/raw_files/` (streaming, incremental, all columns strings).
+- `bronze_orders.py`: Auto Loader over the raw files volume (streaming, incremental, all columns strings). The path comes from pipeline configuration `shop.raw_files_path`, set only in the dev target; the default in the code is the prod volume `/Volumes/workspace/shop/raw_files/`.
 - `bronze_rates.py`: materialized view that calls the Frankfurter API on every run (`API_URL` has a hard-coded start date, 2026-10-01). Stores `eur_to_currency` (1 EUR = X).
 - `data_quality/Bronze Data Quality Check.ipynb` is a Databricks validation notebook for the bronze layer (data quality downstream of bronze is covered by dbt tests).
 - `dashboards/Shop Revenue.lvdash.json` is the source of the AI/BI dashboard bundle resource. It reads the dbt production marts (`workspace.prod_shop_marts.agg_daily_revenue`, `agg_category_revenue`) — hard-coded, also in the dev copy. Edit it in the UI of your dev dashboard and copy the JSON back, or edit the file directly; it is excluded from bundle sync on purpose (a synced `.lvdash.json` becomes a stray dashboard).
 - One-time setup: `setup/01_setup_schema.sql` creates schema `workspace.shop` and volume `raw_files`. Run via Databricks.
-- Daily schedule: job `shop_daily` at 17:00 Europe/Prague runs `run_pipeline` → `run_dbt` → `refresh_dashboard`; each task runs only if the previous one succeeded (`run_if: ALL_SUCCESS`), failures email the owner.
+- Daily schedule: job `shop_daily` at 17:00 Europe/Prague runs `generate_orders` → `run_pipeline` → `run_dbt` → `refresh_dashboard`; each task runs only if the previous one succeeded (`run_if: ALL_SUCCESS`), failures email the owner.
 
 ## Databricks Asset Bundle (`databricks.yml`, `resources/`)
 
 Bundle `shop_pipeline` defines the Lakeflow pipeline (`resources/shop_pipeline.pipeline.yml`), the `shop_daily` job (`resources/shop_daily.job.yml`) and the Shop Revenue dashboard (`resources/shop_revenue.dashboard.yml`). The `dbt/` folder is synced with the bundle and run by the job's `run_dbt` task.
 
 - `run_dbt` is a Databricks dbt task on serverless job compute (environment `dbt`, `dbt-databricks==1.13.0` — keep the same pin as `.github/workflows/ci.yml`). SQL runs on warehouse `a201bb41d987c4b2` (`var.warehouse_id`); the task generates `profiles.yml` itself from `warehouse_id`, `catalog` and `schema` (`var.dbt_schema`). Commands: `dbt deps`, `dbt source freshness`, `dbt build`. `dbt source freshness` exits non-zero on a freshness **error** (bronze `ingested_at` older than 2 days), which is expected to fail the task and skip the build and the dashboard refresh (not yet observed; a WARN does not fail).
-- `dev` (default, `mode: development`): resources are named `[dev <user>] ...`, the job schedule is paused, the pipeline runs in development mode and writes to `workspace.dev_<user>_shop` (created by the bundle); dbt writes to `dev_<user>_shop_staging` / `_intermediate` / `_marts`. Dev still reads prod inputs: raw files from `/Volumes/workspace/shop/raw_files/`, dbt sources from `workspace.shop`, and the dev dashboard queries `prod_shop_marts`.
+- `dev` (default, `mode: development`): resources are named `[dev <user>] ...`, the job schedule is paused, the pipeline runs in development mode and writes to `workspace.dev_<user>_shop` (created by the bundle); dbt writes to `dev_<user>_shop_staging` / `_intermediate` / `_marts`. Dev generates and ingests its own order files in the bundle-created volume `/Volumes/workspace/dev_<user>_shop/raw_files/` (`var.raw_files_path`, also passed to the pipeline as `shop.raw_files_path`), but still reads other prod inputs: dbt sources from `workspace.shop`, and the dev dashboard queries `prod_shop_marts`.
 - `prod` (`mode: production`): bronze in `workspace.shop`, dbt in `prod_shop_*`, job scheduled at 17:00 Europe/Prague.
 
 Commands:
@@ -63,7 +65,7 @@ Conventions:
 
 ## Workflow
 
-`main` is protected: work on `feature/*` / `chore/*` / `docs/*` branches and merge via pull request (no force pushes). `sample_data/` contains synthetic CSVs with intentional data-quality issues (nulls, zero quantity, negative price, duplicates) — these are expected, not bugs.
+`main` is protected: work on `feature/*` / `chore/*` / `docs/*` branches and merge via pull request (no force pushes). `sample_data/` contains synthetic example CSVs, and the daily generated files contain the same intentional data-quality issues (nulls, zero quantity, negative price, duplicates) — these are expected, not bugs.
 
 ## CI (`.github/workflows/ci.yml`)
 
@@ -75,6 +77,6 @@ Runs on every pull request to `main`. It validates and tests only — it never d
 
 ## CD (`.github/workflows/cd.yml`)
 
-The only way to deploy to prod. Runs on push to `main` (i.e. after a PR is merged) when `databricks.yml`, `resources/**`, `pipeline/**`, `dbt/**` or `cd.yml` changed, and on manual start (`workflow_dispatch`, ignores the paths filter). The job uses GitHub Environment `prod`, which requires approval by the repo owner before the deploy starts. Steps: `databricks bundle validate -t prod`, then `databricks bundle deploy -t prod`, authenticated with `DATABRICKS_HOST` / `DATABRICKS_TOKEN`. Concurrency group `cd-prod` keeps deploys strictly one at a time (a running deploy is never cancelled). It does not run the pipeline or the job — the 17:00 schedule does. It also deploys the dbt project files, so dbt changes reach prod only through CD.
+The only way to deploy to prod. Runs on push to `main` (i.e. after a PR is merged) when `databricks.yml`, `resources/**`, `pipeline/**`, `dbt/**`, `src/**` or `cd.yml` changed, and on manual start (`workflow_dispatch`, ignores the paths filter). The job uses GitHub Environment `prod`, which requires approval by the repo owner before the deploy starts. Steps: `databricks bundle validate -t prod`, then `databricks bundle deploy -t prod`, authenticated with `DATABRICKS_HOST` / `DATABRICKS_TOKEN`. Concurrency group `cd-prod` keeps deploys strictly one at a time (a running deploy is never cancelled). It does not run the pipeline or the job — the 17:00 schedule does. It also deploys the dbt project files, so dbt changes reach prod only through CD.
 
 After a bundle deploy the prod job is `UI_LOCKED`: change the pipeline/job in `resources/` via a PR, not in the Databricks UI (UI edits are overwritten by the next deploy).

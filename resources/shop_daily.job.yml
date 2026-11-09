@@ -1,10 +1,10 @@
-# Daily orchestration job: bronze pipeline -> dbt build -> dashboard refresh.
+# Daily orchestration job: synthetic order file -> bronze pipeline -> dbt build -> dashboard refresh.
 # Each task runs only if the previous one succeeded. Originally generated from job 425019135502946.
 resources:
   jobs:
     shop_daily:
       name: shop_daily
-      description: "Daily orchestration: bronze ingestion (Auto Loader for order CSVs, ECB rates API) -> dbt build -> Shop Revenue dashboard refresh. Managed by Databricks Asset Bundle, deployed via GitHub Actions CD."
+      description: "Daily orchestration: synthetic order CSV generation -> bronze ingestion (Auto Loader for order CSVs, ECB rates API) -> dbt build -> Shop Revenue dashboard refresh. Managed by Databricks Asset Bundle, deployed via GitHub Actions CD."
       max_concurrent_runs: 1
       performance_target: PERFORMANCE_OPTIMIZED
       queue:
@@ -23,9 +23,24 @@ resources:
             environment_version: "2"
             dependencies:
               - dbt-databricks==1.13.0            # keep in sync with .github/workflows/ci.yml
+        - environment_key: generator
+          spec:
+            environment_version: "2"              # plain serverless Python, no extra packages
 
       tasks:
+        - task_key: generate_orders               # writes today's synthetic orders_<date>.csv; no-op if it exists
+          environment_key: generator
+          spark_python_task:
+            python_file: ../src/generate_orders.py
+            parameters:
+              - --raw-files-path
+              - ${var.raw_files_path}
+              - --orders-table
+              - ${var.catalog}.${resources.pipelines.shop_pipeline.schema}.bronze_orders
+
         - task_key: run_pipeline
+          depends_on:
+            - task_key: generate_orders
           pipeline_task:
             pipeline_id: ${resources.pipelines.shop_pipeline.id}   # the pipeline from this bundle (dev or prod copy)
           run_if: ALL_SUCCESS
