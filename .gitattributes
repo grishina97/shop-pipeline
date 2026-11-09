@@ -1,1 +1,4 @@
 *.ipynb linguist-documentation
+# AI/BI dashboards: keep the bytes exactly as stored in Databricks. Without this, core.autocrlf on Windows
+# checks the file out with CRLF and "bundle plan" shows a false "update" for the dashboard.
+*.lvdash.json -text
