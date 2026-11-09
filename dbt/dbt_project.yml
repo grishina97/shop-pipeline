@@ -27,3 +27,6 @@ models:
     marts:
       +materialized: table     # -- reporting data marts
       +schema: marts
+
+vars:
+  shop_source_schema: shop     # -- schema of the bronze source "shop"; the dev bundle target overrides it with --vars

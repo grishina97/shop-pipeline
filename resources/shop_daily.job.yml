@@ -58,8 +58,8 @@ resources:
             schema: ${var.dbt_schema}
             commands:
               - dbt deps
-              - dbt source freshness
-              - dbt build
+              - 'dbt source freshness --vars "{shop_source_schema: ${var.dbt_source_schema}}"'   # dev reads dev bronze, prod workspace.shop
+              - 'dbt build --vars "{shop_source_schema: ${var.dbt_source_schema}}"'
 
         - task_key: refresh_dashboard
           depends_on:

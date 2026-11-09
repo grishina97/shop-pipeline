@@ -4,7 +4,7 @@ sources:
   - name: shop
     description: "Bronze layer of shop-pipeline, loaded by Lakeflow Declarative Pipelines."
     database: workspace
-    schema: shop
+    schema: "{{ var('shop_source_schema', 'shop') }}"   # -- bronze schema; dev bundle target passes its dev_<user>_shop
     config:
       loaded_at_field: ingested_at           # -- one column for both tables
       freshness:
